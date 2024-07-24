@@ -1,0 +1,289 @@
+---
+title: 'Mineria de dades: PAC1'
+author: "Autor: Marc Bracons Cucó"
+date: "Octubre 2023"
+output:
+  word_document: default
+  html_document:
+    highlight: default
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+    toc_depth: 2
+    includes:
+      in_header: 05.584-PAC-header.html
+  pdf_document:
+    highlight: zenburn
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+*****
+# Exercici 1
+*****
+
+
+Proposa un projecte complet de mineria de dades. L'organització de la resposta ha de coincidir en les fases típiques del cicle de vida d'un projecte de mineria de dades. **No cal fer les tasques de la fase**. Per a cada fase indica quin és el objectiu de la fase i el producte que s'obtindrà. Utilitza exemples de quines i com podrien ser les tasques. Si hi ha alguna característica que fa diferent el cicle de vida d'un projecte de mineria respecte a d'altres projectes indica-ho.
+
+## Estudi dels hàbits de somni dels animals domèstics
+
+### Comprensió del negoci
+
+En aquesta fase es vol entendre l'importància d'analitzar els hàbits de somni dels animals domèstics i identificar les necessitats principals del projecte. Al final d'aquesta, tindrem un document amb els objectius, criteris d'èxit i un pla detallat del projecte. Per a aconseguir tot això realitzarem les següents tasques:
+
+**1. Determine business objectives:** Entendre la necessitat d'analitzar els patrons de somni per a millorar la salut i benestar dels animals domèstics.
+
+**2. Assess situation:** Identificar les fonts de dades disponibles, com ara sensors de seguiment, bases de dades dels veterinaris o diaris de propietaris. 
+
+**3. Determine data mining goals:** Des del punt de vista tècnic de la mineria de dades, l'èxit en aquest estudi es descobrir patrons en els hàbits de somni i identificar anomalies.
+
+**4. Produce project plan:** Establir un pla amb fases, responsabilitats i terminis. 
+
+### Comprensió de les dades
+
+L'objectiu en aquesta segona fase es recopilar dades sobre els hàbits de somni i comprendre les seves característiques principals, obtenint així conjunts de dades inicials, descripció i exploració de les dades i informes sobre la qualitat de les dades. Les tasques necessaries per assolir aquests punts serien: 
+
+**1. Collect initial data:** Processar i netejar dades per a l'anàlisi.
+
+**2. Describe data:** Descriure les característiques de les dades com la durada del son, frequència dels despertars, etc.
+
+**3. Explore data:** Visualitzar els patrons de somni i identificar possibles anomalies.
+
+**4. Verify data quality:** Assegurar-se que les dades son consistents i no hi ha valors faltants o erronis.
+
+### Preparació de les dades
+
+Un cop tenim les dades, ja les podem processar i netejar per al seu anàlisi, tenint d'aquesta manera, conjunts de dades netejats, integrats i formats. En aquesta fase les tasques a dur a terme son:
+
+**1. Select data:** Filtrar les dades rellevants per l'anàlisi.
+
+**2. Clean data:** Corregir o eliminar dades errònies o outliers.
+
+**3. Construct data:** Crear variables derivades, com ara la mitjana de hores de son per dia.
+
+**4. Integrate data:** Combinar dades de diferents fonts per obtenir una vista completa.
+
+**5. Format data:** Assegurar-se que les dades estan en el format adequat per al modelat.
+
+### Modelat
+
+A continuació es vol desenvolupar models per analitzar i predir hàbits de somni. Al final de la fase tindrem models entrenats i una avaluació del seu rendiment. Per tal d'obtindre aquests models serà necessari dur a terme les següents tasques:
+
+**1. Select modeling techniques:** Triar tècniques d'anàlisi de sèries temporals o clustering.
+
+**2. Generate test design:** Dividir les dades en conjunts d'entrenament i prova.
+
+**3. Build model:** Entrenar models per identificar patrons o predir hàbits de somni.
+
+**4. Assess model**: Avaluar la precisió i utilitat dels models desenvolupats.
+
+### Avaluació
+
+L'objectiu d'aquesta fase és avaluar els resultats des d'una perspectiva general i determinar la seva aplicabilitat. Com a producte tindriem un informe amb les conclusions de l'anàlisi, la idoneïtat dels models i recomenacions per a passos futurs. Les tasques d'aquesta fase serien:
+
+**1. Evaluate results:** Determinar si els models proporcionen informació útil sobre els hàbits de somni dels animals.
+
+**2. Review process:** Revisar tot el procés per identificar possibles millores.
+
+**3. Determine next steps:** Decidir si calen més anàlisis, si es poden aplicar els resultats, o si s'han de prendre altres accions.
+
+### Desplegament
+
+En aquesta última fase, es vol aplicar els resultats i models en un entorn real per millorar el benestar dels animals domèstics. El resultat obtingut seria eines o aplicacions basades en els resultats de l'anàlisi que ajuden a propietaris i veterinàries a entendre i millorar els hàbits de somni dels animals. Les tasques associades a aquesta fase serien:
+
+**1. Creació d'aplicacions i eines:** Crear una aplicació o plataforma on els propietaris poden monitoritzar els hàbits de somni dels seus animals.
+
+**2. Redactar un informe:** Desenvolupar recomanacions basades en l'anàlisi per ajudar a millorar la qualitat del son dels animals.
+
+**3. Millorar de les eines actuals:** Integrar les conclusions amb altres eines o aplicacions existents relacionades amb el benestar animal.
+
+
+
+
+*****
+# Exercici 2
+*****
+A partir del joc de dades utilitzat a l'exemple de la PAC, realitza les tasques prèvies a la generació d’un model de mineria de dades explicades en els mòduls  "El procés de mineria de dades" i "Preprocessat de les dades i gestió de característiques". Pots utilitzar de referència l'exemple però procura canviar l'enfocament i analitzar les dades en funció de les diferent dimensions que presenten les dades. Opcionalment i valorable es poden afegir a l'estudi de dades d'altres anys per a realitzar comparacions temporals (https://www.nhtsa.gov/file-downloads?p=nhtsa/downloads/FARS/) o afegir altres fets a estudiar relacionats, per exemple el consum de drogues en els accidents (https://static.nhtsa.gov/nhtsa/downloads/FARS/2020/National/FARS2020NationalCSV.zip)
+
+## Anàlisi exploratòria
+
+Carreguem el fitxer de l'exemple i també el drugs.csv
+
+```{r}
+path_drugs = 'drugs.csv'
+drugsData <- read.csv(path_drugs, row.names=NULL)
+path = 'accident.CSV'
+accidentData <- read.csv(path, row.names=NULL)
+```
+
+### Exploració del conjunt de dades
+
+En aquest cas només fem l'exploració del fitxer drugs ja que el de accident.csv ja s'ha fet en l'exemple
+
+```{r}
+structure = str(drugsData)
+```
+#### Identificadors de drugs
+ 
++ **ST_CASE** identificador d'accident
++ **STATE** codificació d'estat
++ **VEH_NO** identificador del vehicle
++ **PER_NO** identificador de la persona
++ **DRUGSPEC** identificador de la droga
++ **DRUGRES** resultat del test de drogues
+
+### Identificadors d'accident
+
++ **DAY_WEEK** dia de la setmana
++ **DAY_WEEKNAME** nom de dia de la setmana
++ **HOUR** hora
++ **FATALS** morts
+
+Tot i que a l'exemple guiat ja es presenten tots els identificadors, en aquest exercici només es mostren els que seran utilitzats.
+
+#### Identificadors comuns amb accident
+
+Conjunt d'identificadors que es faran servir per unir les dues taules de dades.
+
++ **ST_CASE** identificador d'accident
++ **STATE** codificació d'estat
+
+Observem que només es necessita **ST_CASE** per unir les dades de les dues fonts, ja que, com diu al document explicatiu de les dades, aquest és un element únic. 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+print('NA')
+colSums(is.na(drugsData))
+```
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+print('Blancs')
+colSums(drugsData=="")
+```
+Observem que no hi ha valors buits ni nuls. 
+
+A continuació farem una primera aproximació al contingut de les dades, per això es crea una nova columna DRUG_DR que té valors 1 o 0 en funció de si el conductor estava o no sota l'efecte de les drogues. La motivació per a l'ús d'aquest nou identificador és la simplificació de possibles valors de l'identificador DRUGRES, de 1000 possibles valors a 2.Per saber quins identificadors hem de tenir en compte per a la reducció es mira el document "Fatality Analysis Reporting System Analutical User's Manual", en concret la pàgina 292. A continuació, s'aprofita l'identificador ST_CASE, que és comú en ambdós datasets, per relacionar-los.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+drugsData$DRUG_DR <- ifelse(drugsData$DRUGRES >= 100 & drugsData$DRUGRES <= 998, 1, 0)
+mergedData <- merge(drugsData, accidentData, by = "ST_CASE")
+summary(mergedData[c("FATALS","DRUG_DR")])
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
+if(!require('Rmisc')) install.packages('Rmisc'); library('Rmisc')
+if(!require('dplyr')) install.packages('dplyr'); library('dplyr')
+if(!require('xfun')) install.packages('xfun'); library('xfun')
+
+histList<- list()
+n = c("FATALS","DRUG_DR")
+mergedDataAux= mergedData %>% select(all_of(n))
+for(i in 1:ncol(mergedDataAux)){
+  col <- names(mergedDataAux)[i]
+  ggp <- ggplot(mergedDataAux, aes_string(x = col)) +
+    geom_histogram(bins = 30, fill = "cornflowerblue", color = "black",ggtittle = "Comptador d'ocurrències per variable") 
+      histList[[i]] <- ggp  # afegim cada plot a la llista buida
+}
+ multiplot(plotlist = histList, cols = 1)
+```
+
+Nombre de morts: Tots els accidents recollits en aquestes dades reporten com a mínim una mort, sent l'accident més greu aquell amb vuit víctimes.
+
+Conductors drogats involucrats a l'accident: "Percentatge d'accidents amb conductors drogats: En un 0.32% dels accidents reportats, el conductor estava sota l'efecte de drogues.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+accidents_by_day <- mergedData %>%
+  dplyr::group_by(DAY_WEEKNAME) %>%
+  dplyr::summarise(Num_Accidents_Drogats = sum(DRUG_DR, na.rm = TRUE)) %>%
+  dplyr::arrange(desc(Num_Accidents_Drogats))
+print(accidents_by_day)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(accidents_by_day, aes(x = reorder(DAY_WEEKNAME, -Num_Accidents_Drogats), y = Num_Accidents_Drogats)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Accidents amb conductors drogats per dia de la setmana",
+       x = "Dia de la setmana",
+       y = "Nombre d'accidents") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Si mirem els nombre d'accidents en cada dia de la setmana, podem veure que hi ha dies en els que se n'han produït un nombre més gran. És durant els Divendres, Dissabtes i Diumenges quan el nombre d'accidents és més elevat.
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+accidents_by_hour <- mergedData %>%
+  dplyr::group_by(HOUR) %>%
+  dplyr::summarise(Num_Accidents_Drogats = sum(DRUG_DR)) %>%
+  dplyr::arrange(desc(Num_Accidents_Drogats))
+print(accidents_by_hour)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(accidents_by_hour, aes(x = reorder(HOUR, -Num_Accidents_Drogats), y = Num_Accidents_Drogats)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Accidents amb conductors drogats per dia de la setmana",
+       x = "Dia de la setmana",
+       y = "Nombre d'accidents") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+En observar el gràfic que estudia les hores amb més accidents, notem una hora que no té sentit: el número 99. Aquest és el valor que es dona a l'identificador quan no es sap la hora de l'accident. Per a la representació gràfica no ens interessa. Tenint en compte que aquest valor apareix només en 390 casos, el més convenient seria ignorar-los. Aprofitem també per ordenar les dades segons les hores del dia, en lloc de fer-ho per nombre d'accidents. 
+
+```{r}
+filtered_accidents_by_hour <- mergedData %>%
+  filter(HOUR != 99) %>%
+  dplyr::group_by(HOUR) %>%
+  dplyr::summarise(Num_Accidents_Drogats = sum(DRUG_DR)) %>%
+  dplyr::arrange(desc(Num_Accidents_Drogats))
+print(accidents_by_hour)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(filtered_accidents_by_hour, aes(x = HOUR, y = Num_Accidents_Drogats)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Accidents amb conductors drogats per hora",
+       x = "Hora",
+       y = "Nombre d'accidents") +
+  theme_minimal() +
+  scale_x_continuous(breaks = 0:23)
+```
+
+Un cop filtrats els valors es pot observar que hi ha una franja on s'acumulen els accidents. Per tal de simplificar, agruparem les hores en franges horaries.
+
+ * Matinada: 00:00 - 05:59
+ * Matí: 06:00 - 11:59
+ * Migdia: 12:00 - 17:59
+ * Vespre: 18:00 - 23:59
+ 
+```{r}
+assign_hour_range <- function(hour) {
+  if(hour >= 0 & hour <= 5) return("Matinada")
+  else if(hour >= 6 & hour <= 11) return("Matí")
+  else if(hour >= 12 & hour <= 17) return("Migdia")
+  else return("Vespre")
+}
+
+mergedData$Hour_Range <- sapply(mergedData$HOUR, assign_hour_range)
+accidents_by_hour_range <- mergedData %>%
+  filter(HOUR != 99) %>%
+  dplyr::group_by(Hour_Range) %>%
+  dplyr::summarise(Num_Accidents_Drogats = sum(DRUG_DR)) %>%
+  dplyr::arrange(desc(Num_Accidents_Drogats))
+print(accidents_by_hour_range)
+```
+
+```{r}
+ggplot(accidents_by_hour_range, aes(x = Hour_Range, y = Num_Accidents_Drogats)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Accidents amb conductors drogats per franja horària",
+       x = "Franja Horària",
+       y = "Nombre d'accidents") +
+  theme_minimal()
+```
+
+Després de fer l'agrupació podem veure que durant el vespre és quan més accident hi ha, al voltant d'un 36% del total. 

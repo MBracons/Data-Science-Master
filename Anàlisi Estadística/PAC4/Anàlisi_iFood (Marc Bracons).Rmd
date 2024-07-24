@@ -1,0 +1,680 @@
+---
+title: "Anàlisi dels Ingressos i la Resposta a les Ofertes de màrqueting entre els clients d'iFood al Brasil"
+author: "Marc Bracons Cucó"
+date: '`r format(Sys.Date(),"%e de %B, %Y")`'
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+# Introducció
+
+Les dades utilitzades corresponen a iFood, la principal aplicació de lliurament d’aliments al Brasil. L’empresa
+ven aliments en diverses categories i cerca millorar el rendiment de les activitats de màrqueting. La nova
+campanya comercial, sisena, té com a objectiu vendre un nou gadget a la base de dades de clients. Es va dur
+a terme una campanya pilot a la que van participar 2.240 clients. Els clients van ser seleccionats a l’atzar i
+contactats per telèfon per a l’adquisició del gadget.
+
+El conjunt de dades d’aquesta pràctica es denomina màrqueting.csv. Les variables que conté són:
+
+ 1. ID: número identificatiu
+ 2. Year_Birth: Any de naixement
+ 3. Education: el nivell educatiu del client (factor amb 5 nivells)
+ 14. Marital_Estatus: l’estat civil del client (factor amb 8 nivells)
+ 5. Income: ingressos anuals del client
+ 6. Kidhome: nombre de nens que habiten amb el client
+ 7. Teenhome: nombre d’adolescents que habiten amb el client
+ 8. Dt_Customer: data d’alta del client en l’empresa
+ 9. Recency: nombre de dies des de l’última compra
+ 10. MntWines: quantitat gastada en vi en els últims 2 anys
+ 11. MntFruits: quantitat gastada en fruita en els últims 2 anys
+ 12. MntMeatProducts: quantitat gastada en carn en els últims 2 anys
+ 13. MntFishProducts: quantitat gastada en peix en els últims 2 anys
+ 14. MntSweetProducts: quantitat gastada en dolços en els últims 2 anys
+ 15. MntGoldProds: quantitat gastada en productes “*gold” en els últims 2 anys
+ 16. NumDealsPurchases: nombre de compres fetes amb descompte
+ 17. NumWebPurchases: nombre de compres fetes a través de la Web
+ 18. NumCatalogPurchases: nombre de compres fetes usant el catàleg
+ 19. NumStorePurchases: nombre de compres fetes directament en botigues
+ 20. NumWebVisitsMonth: nombre de visites a la Web en l’últim mes
+ 21. AcceptedCmp3: 1 si el client accepta l’oferta en la 3r campanya, 0 si no
+ 22. AcceptedCmp4: 1 si el client accepta l’oferta en la 4t campanya, 0 si no
+ 23. AcceptedCmp5: 1 si el client accepta l’oferta en la 5è campanya, 0 si no
+ 24. AcceptedCmp1: 1 si el client accepta l’oferta en la 1r campanya, 0 si no
+ 25. AcceptedCmp2: 1 si el client accepta l’oferta en la 2n campanya, 0 si no
+ 26. Complain: 1 si el client formalitza una queixa en l’últim any
+ 27. Z_CostContact: variable control (s’ha d’excloure de l’anàlisi)
+ 28. Z_Revenue: variable control (s’ha d’excloure de l’anàlisi)
+ 29. Response: 1 si el client accepta l’oferta en l’última campanya, 0 si no
+ 
+ El conjunt de dades original es troba disponible a: https://github.com/nailson/ifood-data-business-analyst-
+test/blob/master/ifood_df.csv
+
+L’objectiu final és desenvolupar un model que permeti identificar als clients segons les seves característiques.
+En aquesta activitat s’analitzarà si els ingressos dels clients estan determinats pel nivell educatiu i altres
+característiques. Per a fer-ho, s’apliquen diferents tipus d’anàlisis, revisant el contrast d’hipòtesis de dues
+mostres, vist a l’activitat A2, i després realitzant anàlisis més complexes com ANOVA.
+
+
+
+# Preprocessament
+
+## Variables Income i Year_Birth
+
+Primer carregarem el fitxer de dades “marketing.csv” i consultarem els tipus de dades de les variables i si és necessari,
+aplicarem les transformacions apropiades.
+
+```{r}
+data <- read.csv("marketing.csv")
+str(data)
+```
+
+Un cop vistes les dades, podem veure que hi ha algunes transformacions que són necessàries:
+
+ * Convertirem les variables categòriques (**Education** i **Marital_Status**) a *factors*.
+ * Convertirem la variable **Dt_Customer** a un objecte de tipus *Data*.
+
+```{r}
+data$Education <- as.factor(data$Education)
+data$Marital_Status <- as.factor(data$Marital_Status)
+
+data$Dt_Customer <- as.Date(data$Dt_Customer, format="%Y-%m-%d")
+```
+
+A continuació ens centrarem en les variables **Income** i **Year_Birth**, buscant possibles inconsistències en els seus valors. Per a fer-ho, primer de tot hem mirat que l'última actualització de les dades en el repositori av ser el 19/02/2020, així que dates posteriors a aquest dia no tenen sentit.
+
+Assumirem:
+ * No hi pot haver valors de **Income** negatius.
+ * Cap client pot tindre més de 100 anys ni menys de 18.
+ 
+Abans però, visualitzarem les variables per a tindre informació visual.
+
+```{r}
+library(ggplot2)
+
+ggplot(data, aes(x = Income)) +
+  geom_histogram(binwidth = 5000, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Distribució dels Ingressos", x = "Ingressos", y = "Freqüència") +
+  theme_minimal()
+
+ggplot(data, aes(y = Income)) +
+  geom_boxplot(fill = "orange", color = "black", alpha = 0.7) +
+  labs(title = "Boxplot dels Ingressos", y = "Ingressos") +
+  theme_minimal()
+
+summary(data$Year_Birth)
+summary(data$Income)
+```
+
+A les gràfiques podem veure clarament com hi ha valors atípics a la variable **Income**. Per eliminar-los el que farem és establir una cota superior raonable, de valor 200000. Els valors per sobre de la cota, seran substituïts per **NA**. Aplicarem també els filtres discutits anteriorment.
+
+```{r}
+library(dplyr)
+library(lubridate)
+
+current_year <- 2020
+data <- data %>%
+  mutate(Year_Birth = ifelse(Year_Birth < 1900 | Year_Birth > (current_year - 18), NA, Year_Birth))
+
+age_limit <- 100
+data <- data %>%
+  mutate(Year_Birth = ifelse((current_year - Year_Birth) > age_limit, NA, Year_Birth))
+         
+income_upper_limit <- 200000
+data <- data %>% mutate(Income = ifelse(Income < 0 | Income > income_upper_limit, NA, Income))
+
+summary(data$Year_Birth)
+summary(data$Income)
+```
+
+## Valors absents
+
+Ara farem tractament per a valors absents. Adoptarem la següent estratègia:
+
+ * El tractament de la variable Income en cas de valors perduts, aplicarem imputació per veïns més
+pròxims, utilitzant la distància de Gower, considerant en el còmput dels veïns més pròxims les variables
+numèriques que representen la despesa en els diferents productes (variables de la 10 a la 15).
+
+ * En cas de valors perduts de la variable Year_Birth, aplicarem imputació considerant el valor mitjà de la
+variable Year_Birth entre les persones enquestades en estat civil "Vidu/a"
+
+ * Eliminarem les observacions amb valors absents per a la resta de variables del conjunt de dades.
+
+ * Revisarem en quantes observacions hem trobat valors absents
+
+La funció **kNN* de la llibreria **VIM* fa servir la distància de Gower per defecte quan es treballa amb variables numèrqiues i categòriques, tal i com és el nostre cas. 
+
+```{r}
+library(VIM)
+library(tidyr)
+
+missing_values_summary <- colSums(is.na(data))
+print(missing_values_summary)
+
+data <- kNN(data, variable = "Income", dist_var = c("MntWines", "MntFruits", "MntMeatProducts", "MntFishProducts", "MntSweetProducts", "MntGoldProds"), k = 5)
+
+data <- subset(data, select = -Income_imp)
+
+mean_year_birth_widow <- mean(data$Year_Birth[data$Marital_Status == "Widow"], na.rm = TRUE)
+data <- data %>%
+  mutate(Year_Birth = ifelse(is.na(Year_Birth) & Marital_Status == "Widow", mean_year_birth_widow, Year_Birth))
+
+final_na_count <- sum(is.na(data))
+cat("Nombre final de valors NA després de la imputació:", final_na_count, "\n")
+
+markclean <- data %>% drop_na()
+
+final_na_count <- sum(is.na(markclean))
+cat("Nombre final de valors NA després de la neteja:", final_na_count, "\n")
+```
+La imputació amb kNN és un mètode efectiu per estimar valors faltants, tot i això, fer una imputació precisa requereix un alt cost computacional i, la qualitat d'aquesta depèn del nombre de veïns usats. També hem usat la mitjana, un mètode més simple però efectiu quan es treballa amb pocs valors faltants.
+
+Finalment, s'han eliminat 3 registres. Això no és preocupant ja que el joc de dades original consta de 2240 observacions, fent que aquesta eliminació no tingui un impacte significatiu en les dades.
+
+
+
+# Estadística descriptiva
+
+## Income
+
+El coeficient de variació (*Desviació estàndar/valor absolut de la mitjana*) es fa servir per analitzar
+si la mitjana és representativa. Un coeficient de variació més petit a 1 es considera que la mitjana és un valor
+representatiu del conjunt de les dades. Calcularem el coeficient de variació de la variable $Income$.
+
+```{r}
+mean_income <- mean(markclean$Income, na.rm = TRUE)
+sd_income <- sd(markclean$Income, na.rm = TRUE)
+
+cv_income <- sd_income / abs(mean_income)
+cat("Coeficient de variació de la variable Income:", cv_income, "\n")
+```
+
+El coeficient de variació és 0.416, cosa que ens indica que la mitjana és un valor representatiu de la distribució dels ingressos.
+
+```{r}
+library(ggplot2)
+
+# Histograma
+ggplot(markclean, aes(x = Income)) +
+  geom_histogram(binwidth = 5000, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Histograma de la distribució dels Ingressos", x = "Ingressos", y = "Freqüència") +
+  theme_minimal()
+
+# Boxplot
+ggplot(markclean, aes(y = Income)) +
+  geom_boxplot(fill = "orange", color = "black", alpha = 0.7) +
+  labs(title = "Boxplot de la distribució dels Ingressos", y = "Ingressos") +
+  theme_minimal()
+
+# QQ plot
+ggplot(markclean, aes(sample = Income)) +
+  stat_qq() +
+  stat_qq_line() +
+  labs(title = "Q-Q Plot dels Ingressos") +
+  theme_minimal()
+```
+
+ * L'histograma ens mostra una distribució molt simètrica amb una lleugera desviació a la dreta. La majoria dels ingressos estan concentrats entre els 20000 i els 80000 amb alguns valors més elevats a la cua de la dreta.
+ 
+ * El boxplot ens mostra una distribució simètrica amb alguns valors atípics per sobre dels 100000, però la majoria de les dades es troben dins del rang interquartil.
+ 
+ * El QQ plot ens mostra que els ingressos no segueixen estrictament una distribució normal. La desviació dels punts de la línia diagonal ens indica que la distribució té una cua llarga a la dreta (cosa que és consistent amb l'histograma). Els punts que es desvien significativament de la línia diagonal, sobretot als extrems, ens indiquen que la distribució no és perfectament normal. 
+ 
+Així doncs, tot i que la mitjana pot ser un valor útil per resumir els ingressos, cal tenir en compte la desviació de la normalitat durant l'anàlisi. 
+
+
+## Education
+
+Mostrem en una taula els estadístics descriptius (mitjana, nombre d’observacions i desviació típica) dels
+ingressos segons el nivell educatiu. 
+
+```{r}
+markclean$Education <- factor(markclean$Education, levels = c("PhD", "Master", "Graduation", "2n Cycle", "Basic"))
+
+descriptive_stats <- markclean %>%
+  group_by(Education) %>%
+  summarize(
+    Mean_Income = mean(Income, na.rm = TRUE),
+    Count = n(),
+    SD_Income = sd(Income, na.rm = TRUE)
+  )
+
+print(descriptive_stats)
+
+ggplot(markclean, aes(x = Education, y = Income)) +
+  geom_boxplot(fill = "orange", color = "black", alpha = 0.7) +
+  labs(title = "Boxplot dels Ingressos segons el Nivell Educatiu", x = "Nivell Educatiu", y = "Ingressos") +
+  theme_minimal()
+```
+
+Podem veure que els ingressos augmenten amb el nivell educatiu, cosa que és coherent amb la hipòtesi que una educació més alta porta a millors oportunitats d'ingressos. La major variabilitat en els ingressos dels nivells educatius més alts pot ser deguda a una major dispersió en les oportunitats laborals i salaris dins d'aquests grups.
+
+En quant al boxplot, observem que no hi ha valors atípics en el nivell educatiu b`aàsic, en la resta sí. Això pot ser degut a algunes persones amb ingressos significativament més alts que la resta, possiblement per posicions laborals molt ben pagades o altres fonts d'ingressos. 
+
+# Estadística inferencial
+
+## Contrast d’hipòtesi per a la diferència de mitjanes
+
+A continuació voldem saber si podem acceptar que els **ingressos mitjans de les persones sense estudis universitaris són inferiors als de les persones amb estudis universitaris** 
+
+### Escriviu la hipòtesi nul·la i l’alternativa
+
+Primer formularem les hipòtesis nul·la i alternativa,
+
+ * **Hipòtesi nul·la (H0):** Els ingressos mitjans de les persones sense estudis universitaris són iguals o superiors als de les persones amb estudis universitaris.
+ 
+ $H0: \mu_{no\_universitaris}\geq\mu_{universitaris}$
+ 
+ * **Hipòtesi alternativa (H1):** Els ingressos mitjans de les persones sense estudis universitaris són inferiors als de les persones amb estudis universitaris.
+ 
+ $H1: \mu_{no\_universitaris}<\mu_{universitaris}$
+
+### Justificació del test a aplicar
+
+Utilitzarem un test de diferència de mitjanes per a mostres independents (test t de Welch) per comparar els ingressos mitjans de les persones amb i sense estudis universitaris. Farem servir aquest test per les següents raons:
+
+ * Mostres independents: Les dades obtingudes de les persones amb i sense estudis universitaris són independents ja que els individus d'un grup no influeixen en els individus de l'altre grup. 
+ 
+ * Comparació de mitjanes: Volem comparar les mitjanes dels dos grups per veure si hi ha una diferència significativa entre els ingressos.
+ 
+  * Variàncies diferents: Suposem que les variàncies dels ingressos en els dos grups poden ser diferents, ja que hem vist diferències en la dispersió dels ingressos quan hem fet l'estudi previ amb els diagrames de caixa.
+  
+  * Assumirem Normalitat: Encara que hem vist que els ingressos no segueixen una distribució normal perfecta, al tindre una mostra prou gran podem fer servir aquest test, que té una desviació moderada respecte a una distribució normal.
+
+### Càlculs
+
+Realitzarem els càlculs de l’estadístic de contrast, valor crític i p valor a un nivell de confiança del 99%
+
+```{r}
+library(dplyr)
+
+no_universitaris <- markclean %>% filter(Education %in% c("Basic", "2n Cycle"))
+universitaris <- markclean %>% filter(Education %in% c("Graduation", "Master", "PhD"))
+
+mean_no_universitaris <- mean(no_universitaris$Income, na.rm = TRUE)
+sd_no_universitaris <- sd(no_universitaris$Income, na.rm = TRUE)
+n_no_universitaris <- nrow(no_universitaris)
+
+mean_universitaris <- mean(universitaris$Income, na.rm = TRUE)
+sd_universitaris <- sd(universitaris$Income, na.rm = TRUE)
+n_universitaris <- nrow(universitaris)
+
+t_stat <- (mean_no_universitaris - mean_universitaris) / sqrt((sd_no_universitaris^2 / n_no_universitaris) + (sd_universitaris^2 / n_universitaris))
+
+df <- ((sd_no_universitaris^2 / n_no_universitaris) + (sd_universitaris^2 / n_universitaris))^2 /
+  ((sd_no_universitaris^2 / n_no_universitaris)^2 / (n_no_universitaris - 1) + (sd_universitaris^2 / n_universitaris)^2 / (n_universitaris - 1))
+
+t_crit <- qt(0.01, df, lower.tail = TRUE)
+p_valor <- pt(t_stat, df)
+
+cat("Mitjana Ingressos (No Universitaris):", mean_no_universitaris, "\n")
+cat("Desviació Estàndard (No Universitaris):", sd_no_universitaris, "\n")
+cat("Nombre d'Observacions (No Universitaris):", n_no_universitaris, "\n")
+
+cat("Mitjana Ingressos (Universitaris):", mean_universitaris, "\n")
+cat("Desviació Estàndard (Universitaris):", sd_universitaris, "\n")
+cat("Nombre d'Observacions (Universitaris):", n_universitaris, "\n")
+
+cat("Estadístic del Test (t):", t_stat, "\n")
+cat("Graus de Llibertat (df):", df, "\n")
+cat("Valor Crític (t_crit):", t_crit, "\n")
+cat("p-valor:", p_valor, "\n")
+```
+
+### Interpretació del test
+
+Podem veure que les persones amb estudis universitaris tenen una mitjana d'ingressos superior a les persones sense estudis universitaris. També la variabilitat dels ingressos és lleugerament superior per a les persones sense estudis universitaris. 
+
+Crida l'atenció que en aquest joc de dades el nombre d'individus amb estudis universitaris és considerablement més gran que el nombre d'individus sense estudis universitaris. En un futur anàlisi es podria mirar si això s'ajusta a la població real o es tracta d'un joc de dades desbalancejat.
+
+Pel que fa a l'estadístic, el seu valor és $t=-7.042279$, un valor negatiu que ens indica que la mitjana dels ingressos dels no universitaris és inferior a la dels universitaris. També hem obtingut que el valor per rebutjar la hipòtesis nul·la ha de ser menor al valor crític $t_{crit}=-2.3386$. El $p_{valor}=6.23e-12$ és significativament menor que el nivell de confiança del 0.01. 
+
+Amb tot això podem rebutjar la hipòtesi nul·la, cosa que significa que hi ha prou evidència com per dir que **els ingressos mitjans de les persones sense estudis universitaris són inferiors als de les persones amb estudis universitaris**.
+
+
+
+# Model de regressió
+
+## Regressió lineal múltiple
+
+Per investigar quines variables expliquen els ingressos dels individus, estimarem un model de regressió lineal múltiple amb les variables Year_Birth, Kidhome, Teenhome,
+Education, MntWines, MntFruits, MntMeatProducts, MntFishProducts, MntSweetProducts, MntGoldProds,
+NumDealsPurchases, NumCatalogPurchases, NumStorePurchases i NumWebVisitsMonth. La categoria de referència per a la variable **Education** serà **Basic**.
+
+```{r}
+markclean$Education <- relevel(markclean$Education, ref = "Basic")
+
+model <- lm(Income ~ Year_Birth + Kidhome + Teenhome + Education + MntWines + MntFruits + MntMeatProducts +
+            MntFishProducts + MntSweetProducts + MntGoldProds + NumDealsPurchases + NumCatalogPurchases +
+            NumStorePurchases + NumWebVisitsMonth, data = markclean)
+
+summary(model)
+```
+
+El valor **Multiple R-squared** ens indica que el 75.73% de la variabilitat en els ingressos es pot explicar amb les variables incloses en el model. L'alt valor de **F-statistic** i el baix valor de **p-value** ens indiquen que el model en conjunt és significativamnet millor que un model sense variables explicatives.
+
+Pel que fa a les variables, la columna **Estimate** ens indica l'efecte de cada variable explicativa sobre **Income**; els valors **p** associats n'indiquen la significança estadística.
+
+Amb tot això, podem treure les següents conclusions:
+
+ * Educació: Els nivells educatius més alts tenen una associació positiva significativa amb ingressos més alts en comparació amb el nivell educatiu **Basic**
+ 
+ * Despeses en Productes: Despeses més altes en vins, carns, fruites i productes dolços estan associades amb ingressos més alts.
+ 
+  * Nombre de Compres i Visites: Més compres a la botiga i per catàleg estan associades amb ingressos més alts, mentre que més compres amb descomptes i visites a la web estan associades amb ingressos més baixos.
+  
+ * Altres Factors: Tenir més nens i adolescents a casa també sembla estar associat amb ingressos més alts.
+
+### Multicolinealitat
+
+Per analitzar possibles problemes de multicolinealitat utilitzarem el factor d’inflació de la variància (vif). Valors de VIF més grans que 10 solen indicar problemes de multicolinealitat.
+
+```{r}
+library(car)
+
+vif_values <- vif(model)
+print(vif_values)
+```
+
+Tots els valors estan per sota de 10, indicant que no hi ha problemes de multicolinealitat entre les variables explicatives del model. 
+
+## Regressió logística
+
+### Model predictiu
+
+Ajustarem un model predictiu basat en la regressió logística per a predir la probabilitat d’acceptar l’oferta en la
+sisena campanya en funció del nombre de compres amb descompte, el nombre de visites de l’últim mes a la
+web i si ha acceptat alguna oferta en campanyes prèvies. Mostreu el resultat del model i interpreteu el model
+en termes de: quines són les variables significatives i com és la qualitat del model.
+
+```{r}
+library(caret)
+library(pROC)
+
+model_logistic <- glm(Response ~ NumDealsPurchases + NumWebVisitsMonth + AcceptedCmp1 + AcceptedCmp2 + AcceptedCmp3 + AcceptedCmp4 + AcceptedCmp5, 
+                      data = markclean, family = binomial)
+
+summary(model_logistic)
+```
+Variables significatives:
+
+ * Les variables NumDealsPurchases, NumWebVisitsMonth, AcceptedCmp1, AcceptedCmp3, AcceptedCmp4, AcceptedCmp5 són significatives, és a dir, tenen un efecte estadísticament significatiu en la probabilitat d'acceptar l'oferta en la sisena campanya.
+ 
+ * AcceptedCmp2 és marginalment significativa amb un p-valor de 0.06515.
+ 
+Coeficients positius:
+
+ * Els coeficients positius per NumDealsPurchases i NumWebVisitsMonth indiquen que un augment en el nombre de compres amb descompte i visites a la web incrementa la probabilitat d'acceptar l'oferta.
+ 
+ * Els coeficients positius per AcceptedCmp1, AcceptedCmp3, AcceptedCmp4, AcceptedCmp5 indiquen que els clients que han acceptat ofertes en campanyes anteriors tenen una major probabilitat d'acceptar l'oferta en la sisena campanya.
+
+### Matriu de confusió
+
+A continuació analitzarem la precisió del model, comparant la predicció del model sobre les mateixes dades
+del conjunt de dades. Assumirem que la predicció del model és 1 (Response) si la probabilitat del model de
+regressió logística és superior o igual a 0.5 i 0 en cas contrari.
+
+```{r}
+pred_prob <- predict(model_logistic, type = "response")
+
+pred_class <- ifelse(pred_prob > 0.5, 1, 0)
+
+conf_matrix <- confusionMatrix(as.factor(pred_class), as.factor(markclean$Response))
+
+cat("Matriu de Confusió:\n")
+print(conf_matrix)
+```
+
+Podem veure que el model fa prediccions correctes el 86.72% de les vegades. A més, la sensibilitat és molt alta (98.21%), això vol dir que el model detecta correctament els casos en què l'oferta no és acceptada. Per altra banda, l'especificitat és baixa (21.26%), cosa que significa que el model detecta correctament només el 21.26% dels casos en què l'oferta és acceptada. 
+
+Així doncs, observem un desequilibri en les classes que pot ser un problema, ja que la major part dels clients no accepten l'oferta, cosa que pot influir en la precisió de la predicció del model. Per tant, aquest model no és prou bo, ja que té un elevat nombre de falsos negatius.
+
+### Predicció
+
+Per a fer una predicció de la probabilitat que un client accepti l'última oferta tenint en compte que ha comprat 5 vegades amb descompte, que ha visitat 10 vegades la web i ha acceptat totes les ofertes de campanyes prèvies, farem servir la següent fórmula de regressió logística:
+
+$log(\frac{p}{1-p})=\beta_0+\beta_1 X_1 +\beta2X_2+...+\beta_nX_n$
+
+On $p$ és la probabilitat d'acceptar l'oferta i $\beta_i$ són els coeficients. Després transformarem el logit obtingut a probabilitat.
+
+```{r}
+intercept <- -3.13449
+coef_NumDealsPurchases <- 0.08110
+coef_NumWebVisitsMonth <- 0.09520
+coef_AcceptedCmp1 <- 1.49145
+coef_AcceptedCmp2 <- 0.91622
+coef_AcceptedCmp3 <- 1.83307
+coef_AcceptedCmp4 <- 0.56563
+coef_AcceptedCmp5 <- 1.99074
+
+NumDealsPurchases <- 5
+NumWebVisitsMonth <- 10
+AcceptedCmp1 <- 1
+AcceptedCmp2 <- 1
+AcceptedCmp3 <- 1
+AcceptedCmp4 <- 1
+AcceptedCmp5 <- 1
+
+logit_p <- intercept + 
+           coef_NumDealsPurchases * NumDealsPurchases + 
+           coef_NumWebVisitsMonth * NumWebVisitsMonth + 
+           coef_AcceptedCmp1 * AcceptedCmp1 + 
+           coef_AcceptedCmp2 * AcceptedCmp2 + 
+           coef_AcceptedCmp3 * AcceptedCmp3 + 
+           coef_AcceptedCmp4 * AcceptedCmp4 + 
+           coef_AcceptedCmp5 * AcceptedCmp5
+
+prob_manual <- exp(logit_p) / (1 + exp(logit_p))
+cat("Probabilitat calculada manualment:", prob_manual, "\n")
+```
+
+Per una altre banda repetirem el càlcul però fent servir la funció **predict** de R.
+
+```{r}
+new_data <- data.frame(
+  NumDealsPurchases = 5,
+  NumWebVisitsMonth = 10,
+  AcceptedCmp1 = 1,
+  AcceptedCmp2 = 1,
+  AcceptedCmp3 = 1,
+  AcceptedCmp4 = 1,
+  AcceptedCmp5 = 1
+)
+
+prob_predict <- predict(model_logistic, newdata = new_data, type = "response")
+cat("Probabilitat calculada amb predict:", prob_predict, "\n")
+```
+
+Les probabilitats calculades manualment i amb la funció **predict** són pràcticament idèntiques amb un valor de 0.9934. A més, el seu alt valor ens indica que la probabilitat que el client accepti l'oferta de la sisena campanya és molt alta. 
+
+# ANOVA unifactorial
+
+A continuació es realitzarà una anàlisi de variància, on es desitja comparar els ingressos per als diferents
+nivells educatius. L’anàlisi de variància consisteix a avaluar si la variabilitat d’una variable dependent pot
+explicar-se a partir d’una o diverses variables independents, denominades factors. En el supòsit que ens
+ocupa, ens interessa avaluar si la variabilitat de la variable Income pot explicar-se pel nivell educatiu.
+
+Hi ha dues preguntes bàsiques a respondre:
+
+ * Existeixen diferències en els ingressos (Income) entre els diferents nivells educatius?
+ 
+ * Si existeixen diferències, entre quins nivells educatius es donen aquestes diferències?
+ 
+## Visualització gràfica
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+
+ggline(markclean, x = "Education", y = "Income", 
+       add = "mean", 
+       ylab = "Ingressos", 
+       xlab = "Nivell Educatiu",
+       title = "Mitjana dels Ingressos segons el Nivell Educatiu")
+```
+
+Podem veure com els ingressos augmenten de forma considerable a mesura que també ho fa el nivell educatiu. El nivell **PhD** presenta la mitjana més alta. Aquests resultats són consistents amb els obtingut en l'anàlisi fet anteriorment. 
+
+## Hipòtesi nul·la i alternativa
+
+ * Hipòtesi nul·la: No hi ha diferències significatives en els ingressos mitjants dels diferents grups educatius.
+ 
+ $H_0: \mu_1=\mu_2=\mu_3=\mu_4=\mu_5$
+ 
+ * Hipòtesi alternativa: Almenys una de les mitjanes dels ingressos es diferent.
+
+## Efectes dels nivells del factor i força de relació
+
+Proporcionarem l’estimació de l’efecte dels nivells del factor Education. Calcularem la part de la variabilitat dels ingressos explicada per l’efecte dels nivells (força de relació). És a dir, calcularem $\eta²=\frac{SSB}{SST}$ del model.
+
+```{r}
+anova_model <- aov(Income ~ Education, data = markclean)
+
+anova_summary <- summary(anova_model)
+print(anova_summary)
+
+model_coefficients <- summary.lm(anova_model)
+print(model_coefficients)
+
+anova_table <- anova(anova_model)
+
+SSB <- anova_table["Education", "Sum Sq"]
+SST <- sum(anova_table[ , "Sum Sq"])
+
+eta_squared <- SSB / SST
+cat("η² =", eta_squared, "\n")
+```
+
+Els coeficients del model ANOVA ens proporcionen l'estimació de l'efecte dels nivells del factor Education en els ingressos. Podem veure que tots els coeficients són estadísticament significatius (valor p < 2e-16), així que hi ha diferències significatives en els ingressos segons el nivell educatiu.
+
+El valor de $eta²$ ens indica que aproximadament el 6.28% de la variabilitat total dels ingressos pot ser explicada en funció del nivell educatiu. Tot i que l'educació és un factor important, hi ha altres factors que contribueixen més a la variabilitat dels ingressos.
+
+
+## Normalitat dels residus
+
+Per avaluar la normalitat dels residus del model ANOVA, utilitzarem el gràfic normal QQ i el test Shapiro-Willk.
+
+ * El gràfic normal QQ ens ajudarà a visualitzar si els residus segueixen una distribució normal.
+ * El test Shapiro-Wilk és un test estadístic que ens ajudarà a avaluar la normalitat dels residus. La hipòtesi nul·la del test és que els residus segueixen una distribució normal. Si el valor p és menor que el nivell de significança, rebutjarem la hipòtesi nul·la i direm que els residus no segueixen una distribució normal.
+
+```{r}
+residuals_anova <- residuals(anova_model)
+
+qqnorm(residuals_anova)
+qqline(residuals_anova, col = "red")
+
+shapiro_test <- shapiro.test(residuals_anova)
+print(shapiro_test)
+```
+
+Observant el gràfic Normal QQ podem veure que els punts no segueixen exactament una línia recta, sobretot als extrems, indicant la presència de valors atípics. 
+
+Donat el baix valor del **p-value** rebutgem la hipòtesi nul·la, és a dir, hi ha prou evidència com per dir que els residus no segueixen una dsitribució normal. 
+
+**Homocedasticitat dels residus** El gràfic “Residuals vs Fitted” proporciona informació sobre la homoce-
+dasticitat dels residus. Mostreu i interpreteu aquest gràfic.
+
+```{r}
+fitted_values <- fitted(anova_model)
+
+plot(fitted_values, residuals_anova,
+     xlab = "Valors Ajustats (Fitted Values)",
+     ylab = "Residus",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red", lwd = 2)
+```
+
+Podem veure que els residus estan dispersos de manera desigual al voltant de la línia horitzontal de zero. També hi ha una concentració de residus per als valors ajustats més baixos, però una major variabilitat als més alts. Basant-nos en el gràfic podem dir que no hi ha evidència d'homocedasticitat en els residus.  Això pot afectar la validesa de les inferències del model, ja que una de les assumpcions  d'ANOVA és que la variància dels errors és constant.
+
+# Comparacions múltiples
+
+Amb independència del resultat obtingut en l’apartat anterior, realitzarem un test de comparació múltiple entre
+els grups amb correcció de Bonferroni. Aquest test s’aplica quan el test ANOVA retorna rebutjar la hipòtesi
+nul·la d’igualtat de mitjanes.
+
+```{r}
+pairwise_results <- pairwise.t.test(markclean$Income, markclean$Education, p.adjust.method = "bonferroni")
+print(pairwise_results)
+```
+
+ * Totes les comparacions entre **Basic** i altres nivells educatius tenen **p-values** molt petits, indicant diferències significatives en els ingressos. 
+ 
+ * No hi ha diferències significatives en els ingressos entre PhD i Master, i entre Master i Graduation.
+ 
+ * Hi ha diferències significatives en els ingressos entre PhD i Graduation, i entre PhD i 2n Cycle.
+ 
+ * No hi ha diferències significatives en els ingressos entre Graduation i 2n Cycle, i entre Master i 2n Cycle.
+
+# ANOVA multifactorial
+
+A continuació, es desitja avaluar l’efecte sobre Income del nivell educatiu combinat amb si accepta o no
+l’oferta de l’última campanya.
+
+## Anàlisi visual dels efectes principals i possibles interaccions
+
+Dibuixarem en un gràfic la variable Income en funció de Education i en funció de Response. El gràfic ha de
+permetre avaluar si hi ha interacció entre els dos factors.
+
+ 1. Agruparem el conjunt de dades per Education i per Response. Calcularem la mitjana d’ingressos per a cada
+grup. Mostrem el conjunt de dades en forma de taula (data frame), on es mostri la mitjana de cada
+grup segons Education i Response.
+
+```{r}
+mean_income_by_group <- markclean %>%
+  group_by(Education, Response) %>%
+  summarise(Mean_Income = mean(Income, na.rm = TRUE))
+
+print(mean_income_by_group)
+```
+
+ 2. Mostrem en un gràfic el valor mitjà de la variable Income per a cada factor. Interpretem el resultat
+sobre si només hi ha efectes principals o hi ha interacció entre els factors. 
+
+```{r}
+ggplot(mean_income_by_group, aes(x = Education, y = Mean_Income, color = as.factor(Response), group = Response)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  labs(title = "Mitjana dels Ingressos segons Nivell Educatiu i Resposta a l'Oferta",
+       x = "Nivell Educatiu",
+       y = "Mitjana dels Ingressos",
+       color = "Resposta a l'Oferta") +
+  theme_minimal()
+```
+
+Al gràfic hi observem que tant l'educació com la resposta tenen relació amb els ingressos. 
+
+## Càlcul del model
+
+Analitzem la interacció entre els factors Education i Response en relació a la variable Income.
+
+```{r}
+anova_multifactorial <- aov(Income ~ Education * Response, data = markclean)
+
+summary(anova_multifactorial)
+```
+
+## Interpretació dels resultats
+
+Tant el nivell educatiu com la resposta a l'oferta ens indiquen que hi ha diferències significatives. En canvi, la interacció entre l'educació i la resposta no és significativa, cosa que ens indica que l'efecte del nivell educatiu sobre els ingressos no depèn se si s'ha acceptat o no l'oferta. Els efectes dels dos factors són independents l'un de l'altre.
+
+# Resum executiu
+
+L'objectiu d'aquest estudi és entendre les diferències en els ingressos dels clients en funció del seu nivell educatiu i la seva facilitat per acceptar una oferta en l'última campanya. Els resultats obtinguts ens han proporcionat una informació valuosa per a l'equip de màrqueting i la presa de decisions.
+
+**Principals conclusions**
+
+* Impacte del nivell educatiu en els ingressos: Els clients amb un nivell educatiu més alt tenen ingressos mitjans significativament superiors als clients que no el tenen. Per exemple, els clients amb un doctorat tenen ingressos mitjans notablement més alts que els clients amb només una educació bàsica. Les dades ens han mostrat que l'educació té un efecte positiu i significatiu en els ingressos, així doncs es recomena que els esforços del departament de màrqueting ens centrin en clients amb nivells educatius més alts.
+
+* Facilitat per acceptar l'oferta i ingressos: Els clients que van acceptar l'última oferta tenen ingressos mitjans més alts que aquells no la van acceptar. Això ens indica que els clients amb ingressos més alts són més propensos a respondre positivament a les ofertes.
+
+* Interacció entre el nivell educatiu i l'acceptació de l'oferta: Tot i que tant el nivell educatiu com la resposta a l'oferta tenen efectes independents i significatius sobre els ingressos, no s'ha observat que aquests factors interactuïn entre ells de manera significativa.
+
+**Implicacions per a l'estratègia de màrqueting**
+
+ * Tenint en compte que els clients amb nivells educatius més alts i ingressos més alts són més propensos a acceptar ofertes, recomanem segmentar les campanyes i dirigir-les específicament a aquests grups.
+ 
+ * Es podria considerar la creació d'ofertes personalitzades per a clients amb ingressos i nivells educatius més alts, cosa que podria augmentar l'eficàcia de les campanyes.
+
+

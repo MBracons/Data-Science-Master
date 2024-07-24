@@ -1,0 +1,546 @@
+---
+title: 'Mineria de dades: PAC3 - Classificació amb arbres de decisió'
+author: "Autor: Marc Bracons"
+date: "Desembre 2023"
+output:
+  html_document:
+    highlight: default
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+    toc_depth: 2
+    includes:
+      in_header: 05.584-PAC-header-3.html
+  pdf_document:
+    highlight: zenburn
+    toc: yes
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval=T, echo=T)
+```
+
+*****
+# Recursos bàsics
+*****
+
+Aquesta Prova d'Avaluació Continuada (PAC) cobreix principalment el mòdul de models supervisats i d'avaluació de models.
+
+Complementaris:
+
+* El material docent "Creació i avaluació de models no supervisats" proporcionat per la UOC.
+* Fitxer titanic.csv.
+* R package C5.0 (Decision Trees and Rule-Based Models): https://cran.r-project.org/web/packages/c50/index.html
+* Fitxer de "German Credit": credit.csv (es va obtenir de https://www.kaggle.com/shravan3273/credit-approval)
+
+La descripció de les variables es pot veure a https://archive.ics.uci.edu/ml/datasets/statlog+(german+credit+data)
+
+**La variable "default" és el target sent 1 = "No default" i 2 = "Default". S'han de fer servir aquestes dades per a la realització dels exercicis.**
+
+
+*****
+# Anàlisi descriptiu i de correlacions
+*****
+
+
+## Exploració del joc de dades
+
+Primer carregarem les dades en un dataframe i mirarem les seves dimensions. Podem veure que tenim 1.000 files amb 21 columnes, on les files són registres i les columnes, atributs.
+
+```{r}
+data<-read.csv("credit-1.csv", header=T, sep=",")
+attach(data)
+
+dim(data)
+```
+
+El següent pas és mirar quins son els atributs amb els que estem treballant. Podem veure que tenim tant variables numèriques com categòriques. Amb aquesta informació ja podriem fer un quadre-resum dels atributs.
+
+```{r}
+str(data)
+```
+Abans de fer-ho, transformarem les variables a tipus factor, és a dir, a un tipus de dades que s'utilitza per a dades categòriques i assigna un conjunt fix de valors únics que poden prendre les variables. Per exemple, podem veure que l'atribut *checking_balance* pot pendre quatre valors diferents, i a cada un d'ells s'hi ha assignat un nombre (1,2,3 o 4).
+
+```{r}
+data[] <- lapply(data, factor)
+str(data)
+```
+Podem organitzar l'informació obtingutda fins ara en el següent quadre-resum.
+
+| Nom del atribut       | Descripció                                  | Tipus          | Nivells    |
+| --------------------- | ------------------------------------------- | -------------- | ---------- |
+| checking_balance      | Saldo del compte corrent                    | Categòrica     | 4          |
+| months_loan_duration  | Durada del préstec en mesos                 | Numèrica       | 33         |
+| credit_history        | Història de crèdit                          | Categòrica     | 5          |
+| purpose               | Finalitat del préstec                       | Categòrica     | 10         |
+| amount                | Import del préstec                          | Numèrica       | 921        |
+| savings_balance       | Saldo d'estalvis                            | Categòrica     | 5          |
+| employment_length     | Durada de l'ocupació laboral                | Categòrica     | 5          |
+| installment_rate      | Taxa d'instal·lació                         | Numèrica       | 4          |
+| personal_status       | Estatus personal                            | Categòrica     | 4          |
+| other_debtors         | Altres deutors                              | Categòrica     | 3          |
+| residence_history     | Història de residència                      | Numèrica       | 4          |
+| property              | Propietat                                   | Categòrica     | 4          |
+| age                   | Edat                                        | Numèrica       | 53         |
+| installment_plan      | Pla d'instal·lació                          | Categòrica     | 3          |
+| housing               | Habitatge                                   | Categòrica     | 3          |
+| existing_credits      | Crèdits existents                           | Numèrica       | 4          |
+| default               | variable objectiu                           | Numèrica       | 2          |
+| dependents            | Dependents                                  | Numèrica       | 2          |
+| telephone             | Telèfon                                     | Categòrica     | 2          |
+| foreign_worker        | Treballador estranger                       | Categòrica     | 2          |
+| job                   | Tipus de feina                              | Categòrica     | 4          |
+ 
+També s'ha de tindre en compte si hi ha valors nuls i la distribució de valors per variables. A continuació podem veure un resum estadístic del nostre joc de dades, en ell s'hi inclou la freqüència de les categories. 
+
+ * *checking_balance*: La majoria de valors son "unkown" (394 observacions), cosa que ens indica una possible varietat de saldos de compte corrent dels clients.
+ * *monts_loan_duration*: Les duracions més freqüents de préstecs son de 24 i 12 mesos (184 i 179 observacions), indicant que la majoria dels préstecs són a curt o mig termini.
+ * *credit_history*: Més de la meitat dels clients (530) tenen un historial de crèdit "repaid", mentre que 293 tenen un historial "critical". Això pot indicar una tendència cap a clients amb bona capacitat de pagament.
+ * *purpose*: Els propòsits més comuns dels préstecs són per a "radio/tv" i "car (new)" (280 i 234 observacions), indicant una possible preferència per préstecs de consum.
+ * *amount*: No podem treure informació interessant sobre aquest atribut amb la informació obtinguda fins ara. 
+ * *savings_balance*: Una gran quantitat de clients (603) tenen estalvis inferiors a 100 DM, cosa que ens permet veure un possible
+ perfil econòmic dels sol·licitants del préstec.
+ * *employment_length*: Pràcticament la meitat dels clients (400) porten entre 4 i 7 anys (174) o més (253) anys d'antiguitat laboral.
+ * *installment_rate*: La majoria dels clients (476) tenen una taxa d'instal·lació de nivell 4, indicant possiblement les condicions de pagament del préstec.
+ * *personal_status*: Els sol·licitants de préstecs són majoritàriament "single male" (548), seguit per "female" (310). Però és importnat remarcar que per a "male" hi ha quatre possibles varacions (single, divorced i married) i per a "female" no n'hi ha cap.
+ * *other_debtors*: La majoria dels clients (907) no tenen altres deutors.
+ * *residence_history*: Un gran nombre de clients (413) han viscut a la seva residència actual durant 4 anys o més.
+ * *property*: Les propietats més comunes són "other" (332) i "real estate" (282), tot i això els 4 nivells tenen una representació equivalent en el joc de dades.
+ * *age*: Amb aquest tipus de resum no podem donar informació sobre aquesta dada. 
+ * *installment_plan*: La majoria dels clients (847) no tenen cap pla d'instal·lació.
+ * *housing*: La majoria dels clients (713) tenen habitatge propi.
+ * *existing_credits*: Més de la meitat dels clients (633) només tenen un crèdit, però una tercera part (333) en tenen dos. 
+ * *default*: Aquesta és la variable objectiu, podem veure que la majoria dels clients (700) estan en "No default", indicant així que en el joc de dades les mostres no tenen una representació equitativa, és a dir, hi ha un desequilibri de classes.
+ * *dependent*: la majoria dels clients (854) tenen un sol dependent. Aquest atribut ens pot donar informació sobre les responsabilitats del individu. 
+ * *telephone*: Més de la meitat dels clients (596) no tenen registrat un telèfon.
+ * *foreign_worker*: La majoria dels clients (963) no són estrangers. Aquesta dada ens pots donar informació sobre la composició demogràfica del grup de clients si tenim en compte la del pais.
+ * *job*: La majoria dels clients (630) són empleats qualificats.
+
+```{r}
+summary(data)
+```
+Els atributs "amount" i "age" necessiten una exploració diferent. Pot aportar informació important saber la mitja o la moda entre d'altres. 
+
+ * *amount*: Els rangs tenen una variació molt gran, des de 250 fins a 18424, cosa que indica una gran diversitat. A més, la mediana (2320) és significativament menor a la mitjana (3271), indicant una distribució asimètrica amb una cua cap als valors més alts. En la informació per quartils hi podem veure que primer quartil és 1,366 i el tercer quartil és 3,972 (el 50% dels préstecs estan dintre d'aquest rang). La diferència entre aquests quartils mostra també una ampla dispersió en els imports dels préstecs.
+ 
+ * *age*: Podem veure una gran variació en el rang d'edats, anant des de els 19 fins als 75 anys. La mediana és 33 i la mijtana lleugerament superior amb 35.55 anys. Que la diferència sigui relativament petita ens pot indicar que la distribució de l'edat és més simètrica que la de *amount*. El 50% dels clients tenen entre 27 i 42 anys, cosa que indica que la majoria dels clients són relativament joves. 
+
+```{r}
+data$amount <- as.numeric(as.character(data$amount))
+data$age <- as.numeric(as.character(data$age))
+
+summary(data[c("amount", "age")])
+```
+
+Finalment buscarem valors faltants (en la descripció del joc de dades ja hi posa que no hi ha 'missing values', però sempre és una bona pràctica mirar-ho). Podem veure que, efectivament, no hi ha valors faltants.
+
+```{r}
+missing <- data[is.na(data),]
+dim(missing)
+```
+
+
+## Visualització
+
+La visualització de les dades és una eina molt valuosa, ja que ens pot permetre entendre relacions que no haviem vist fins ara, aportant un coneixement major sobre les dades que tenim. 
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+library(rlang)
+```
+
+En funció del tipus de variable amb el que treballarem optarem per un tipus de visualització o una altre. Per a simplificar el codi, crearem una funció per a cada tipus de variables i les separarem en grups. Com hi ha 21 variables, visualitzarem aquelles dades que poden ser més interessants.
+
+ * *credit_history*: Reflecteix el comportament de pagament passat, que pot ser un bon predictiu del comportament futur.
+ * *amount*: Indica la càrrega financera del préstec i influïr directament en la capacitat de pagament.
+ * *employment_length*: Reflecteix la seguretat laboral, que està directament relacionada amb la capacitat del client per a mantenir ingressos estables.
+ * *savings_balance*: Mostra la capacitat del client per estalviar. A més, pot ser un coixí contra el deute. 
+ * *age*: Pot estar relacionada amb la maduresa financera i la fase de vida del client respecte als ingressos i despeses.
+ * *residence_history*: Mostra l'estabilitat domèstica.
+ 
+Aquestes variables han estat seleccionades perquè juntes proporcionen una visió àmplia de la salut financera i l'estabilitat dels clients dels préstecs. Per poder fer les visualitzacions de les variables numèriques primer les tornarem a transformar a valor numèrics.
+
+```{r}
+data$amount <- as.numeric(as.character(data$amount))
+data$age <- as.numeric(as.character(data$age))
+
+# Separació en diferents grups
+grafics_barres_vars <- c("credit_history", "savings_balance", "employment_length", "residence_history")
+histogrames_vars <- c("amount", "age")
+
+# Crear i mostrar gràfics de barres
+for (var in grafics_barres_vars) {
+  print(
+    ggplot(data, aes_string(x = var)) + 
+      geom_bar() + 
+      labs(title = paste("Distribució de", var), x = var, y = "Count") +
+      theme(axis.text = element_text(size = 12),  # Mida de l'etiqueta dels tics dels eixos
+            axis.title = element_text(size = 14))  # Mida del títol dels eixos
+  )
+}
+
+# Crear i mostrar histogrames
+for (var in histogrames_vars) {
+  print(
+    ggplot(data, aes_string(x = var)) + 
+      geom_histogram(bins = 30, fill = "deepskyblue2", color = "black") + 
+      labs(title = paste("Histograma de", var), x = var, y = "Freqüència") +
+      theme(axis.text = element_text(size = 12),  # Mida de l'etiqueta dels tics dels eixos
+            axis.title = element_text(size = 14))  # Mida del títol dels eixos
+  )
+}
+```
+
+Per seguir l'estudi discretitzarem els atributs *amount* i *age*, fixant intervals (Min, 1st Qu), (1st Qu.+1, Median), (Median+1, 3rd Qu) i (3rd Qu.+1, Max). I ara ja podem veure la relació entre default i les demés variables, això ho farem mitjançant gràfics de barres apilats i les taules de contingència.
+
+* Edat: Sembla que hi ha una major proporció de clients problemàtics en el grup més jove (0-27 anys) en comparació amb altres grups d'edat.
+ * Quantitat del préstec: El grup amb préstecs més alts (3973-18424) mostra una proporció més alta de clients problemàtics en comparació amb els altres grups.
+ * Estat del compte corrent: Els comptes amb un saldo menor a 0 DM mostren una alta proporció de clients problemàtics. Els comptes desconeguts, en canvi, en tenen una proporció relativament baixa.
+ * Durada del préstec: Els préstecs més llargs (per exemple, 48, 60, 72 mesos) tendeixen a tenir una major proporció de clients problemàtics.
+ * Història de crèdit: Els clients amb una història de "crític" o "endarrerit" en els pagaments tenen proporcions més altes de clients problemàtics.
+ * Propòsit: Els préstecs per a cotxes nous i mobles tendeixen a tenir una proporció més alta de clients problemàtics.
+ * Estalvi: Els comptes d'estalvi amb menys de 100 DM mostren una major proporció de clients problemàtics.
+ * Antiguitat laboral: Les persones amb menys de 1 any de treball tendeixen a tenir una major proporció de clients problemàtics.
+ * Taxa d'instal·lació: Les taxes d'instal·lació més altes (4) mostren una major proporció de clients problemàtics.
+ * Estat personal: Els homes solters mostren una major proporció de clients problemàtics.
+ * Altres deutors: Majoria dels préstecs no tenen altres deutors, i aquests tenen una major proporció de clients problemàtics.
+ * Propietat: Els clients que no tenen propietats (unknown/none) mostren una major proporció de clients problemàtics.
+ * Pla d'instal·lació: Els clients sense pla d'instal·lació tendeixen a tenir una major proporció de clients problemàtics.
+ * Habitatge: Els clients que viuen en habitatges lliures mostren una major proporció de clients problemàtics.
+ * Treballador estranger: La majoria dels préstecs són per a treballadors estrangers, però la proporció de clients probelmàtics no varia significativament.
+ * Ocupació: Els empleats qualificats mostren una major proporció de clients problemàtics.
+ 
+Pel que fa a la resta d'atributs no s'hi veuen patrons clars.
+
+```{r}
+# Atribut 'amount'
+data$amount_cat <- cut(data$amount,
+                       breaks = c(0, 1366, 2320, 3972, 18424),
+                       labels = c("0-1366", "1366-2320", "2321-3972", "3973-18424"),
+                       include.lowest = TRUE)
+# Atribut 'age'
+data$age_cat <- cut(data$age,
+                    breaks = c(0, 27, 33, 42, 75),
+                    labels = c("0-27", "28-33", "34-42", "43-75"),
+                    include.lowest = TRUE)
+```
+
+```{r}
+# Funció per crear gràfics de barres apilats
+barres_apilats <- function(variable_name) {
+  ggplot(data, aes_string(x = variable_name, fill = "default")) + 
+    geom_bar(position = "stack") + 
+    scale_fill_manual(values = c("1" = "deepskyblue2", "2" = "coral2")) +
+    labs(title = paste("Relació entre 'default' i", variable_name), 
+         x = variable_name, y = "Count", fill = "Default") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Gràfics
+barres_apilats("age_cat")
+barres_apilats("amount_cat")
+barres_apilats("checking_balance")
+barres_apilats("months_loan_duration")
+barres_apilats("credit_history") 
+barres_apilats("purpose")
+barres_apilats("savings_balance")
+barres_apilats("employment_length")
+barres_apilats("installment_rate")
+barres_apilats("personal_status") 
+barres_apilats("other_debtors") 
+barres_apilats("residence_history")
+barres_apilats("property") 
+barres_apilats("installment_plan")
+barres_apilats("housing") 
+barres_apilats("existing_credits")
+barres_apilats("dependents") 
+barres_apilats("telephone") 
+barres_apilats("foreign_worker")
+barres_apilats("job")
+```
+
+
+```{r}
+variables <- c("age_cat", "amount_cat", "checking_balance", "months_loan_duration", 
+               "credit_history", "purpose", "savings_balance", "employment_length", 
+               "installment_rate", "personal_status", "other_debtors", "residence_history", 
+               "property", "installment_plan", "housing", "existing_credits", 
+               "dependents", "telephone", "foreign_worker", "job")
+
+for (var in variables) {
+  # Crea la taula de contingència
+  taula_temp <- table(data[[var]], data$default)
+
+  # Mostra el nom de la variable i la taula
+  cat("\nTaula de contingència per a", var, "i default:\n")
+  print(taula_temp)
+}
+```
+*****
+# Desenvolupament d'un primer arbre de decisió
+*****
+Per a poder avaluar del model és necessari tindre un conjunt de training i un de testing. El primer serà el sub-conjunt del conjunt de dades fet servir per a l'obtenció del model. El conjunt de testing són les dades (no vistes pel model durant l'entrenament) que es fan servir per avaluar la qualitat del model. 
+
+## Conjunts d'entrenament i testing
+
+Destinarem el 66% de les mostres a training i el 33% a testing. A més, guardarem una seed per a poder reproduïr l'estudi en cas que sigui necessari. Per facilitar el procediment, mourem la columna 'default', la nostre variable objectiu, a la última posició de 'data'. També aprofitarem per eliminar 'age' i 'amount', ja que les hem discretitzat. 
+
+```{r}
+default_col <- data$default
+data <- data[, !(names(data) %in% c("default"))]
+data <- data[, !(names(data) %in% c("age"))]
+data <- data[, !(names(data) %in% c("amount"))]
+data$default <- default_col
+```
+
+```{r}
+set.seed(666)
+y <- data[,21] 
+X <- data[,1:20] 
+```
+
+De manera dinàmica podem definir una manera de separar les dades en funció d’un paràmetre, en aquest cas del “split_prop”. Definim un paràmetre que controla el split de manera dinàmica en el test.
+
+```{r}
+split_prop <- 3 
+indexes = sample(1:nrow(data), size=floor(((split_prop-1)/split_prop)*nrow(data)))
+trainX<-X[indexes,]
+trainy<-y[indexes]
+testX<-X[-indexes,]
+testy<-y[-indexes]
+```
+
+Ara és un bon moment per veure un resum dels conjunts de test i train per veure que tot ha sortit correctament i que la proporció de defaults és la mateixa que al joc de dades original.
+
+```{r}
+summary(trainX);
+```
+
+```{r}
+summary(trainy);
+```
+
+```{r}
+summary(testX);
+```
+
+```{r}
+summary(testy);
+```
+
+Observem hi ha més casos de default = 1 que de default = 2 tant en entrenament com en testing, però aquesta proporció també hi és en el joc de dades original. A més, la proporcio és de aproximadament 2.3 vegades default = 1 sobre default = 2 en els dos conjunts. 
+
+## Creació del model, qualitat del model i extracció de regles
+
+```{r}
+trainy = as.factor(trainy)
+model <- C50::C5.0(trainX, trainy,rules=TRUE )
+summary(model)
+```
+
+Podem veure que 'checking_balance' és la variable més utilitzada (100% d'ús), indicant que l'estat del compte corrent és un factor clau per a la predicció. A continuació hi tenim 'property' (84%) suggerint que el tipus de propietat que posseeix el client és significatiu per determinar la seva solvència. Altres variables com 'months_loan_duration' (18.77%), 'amount_cat' (5.26%), 'credit_history' (4.50%) i 'employment_lenght' (4.50%) també hi juguen un paper important però en menor mesura. La resta de variables tenen un ús menor al 4%. Comentar també que l'arbre classifica malament 104 dels 1000 casos, representant un 15.6% del total.
+
+Abans de mostrar l'arbre obtingut, eliminarem les dades menys representatives, ja que en cas contrari, l'arbre tindrà moltes branques. Per tant, repetirem el procés que hem dut a terme per al nou dataframe. 
+
+```{r}
+data_clean <- data[, !(names(data) %in% c("savings_balance", "job", "purpose", 
+                                          "installment_rate", "other_debtors", 
+                                          "installment_plan", "age_cat", 
+                                          "existing_credits", "dependents"))]
+
+set.seed(666)
+y <- data_clean[,12] 
+X <- data_clean[,1:11] 
+
+split_prop <- 3 
+indexes = sample(1:nrow(data), size=floor(((split_prop-1)/split_prop)*nrow(data)))
+train_cleanX<-X[indexes,]
+train_cleany<-y[indexes]
+test_cleanX<-X[-indexes,]
+test_cleany<-y[-indexes]
+
+trainy = as.factor(train_cleany)
+model_clean <- C50::C5.0(train_cleanX, train_cleany,rules=TRUE )
+summary(model_clean)
+```
+
+```{r}
+library(grid)
+model_clean <- C50::C5.0(train_cleanX, train_cleany)
+plot(model_clean,gp = gpar(fontsize = 6))
+```
+
+Tot i haver fet aquestes simplificacions, podem veure que l'arbre té moltes branques per a ser visualitzat. Una opció podria ser guardar la imatge a part per a estudiar-la més en profunditat. De totes maneres, la informació que voliem ja la tenim així que seguirem endavant amb la validació del model. Seguirem amb el model original, al que no li hem tret dades.
+
+## Validació del model amb les dades de testing
+
+```{r}
+predicted_model <- predict( model, testX, type="class" )
+print(sprintf("La precisió de l'árbre és: %.4f %%",100*sum(predicted_model == testy) / length(predicted_model)))
+```
+
+A més, sempre és útil fer servir la matriu de confusió per veure els falsos postius, falsos negatius, verdaders positius i verdaders negatius. La matriu mostra els següents resultats:
+
+ * True Positives (TP): El model ha predit correctament la classe 1. Aquí, 212 és el nombre de TP.
+ * False Positives (FP): El model ha predit incorrectament la classe 1 quan en realitat era la classe 2. Aquí, 61 és el nombre de FP.
+ * False Negatives (FN): El model ha predit incorrectament la classe 2 quan en realitat era la classe 1. Aquí, 22 és el nombre de FN.
+ * True Negatives (TN): El model ha predit correctament la classe 2. Aquí, 39 és el nombre de TN.
+ 
+Podem veure com podem calcular la precisió del model a partir de la matriu de confusió, ja que la presició es pot calcular com:
+
+$\frac{(TP+TN)}{TP+TN+FP+FN}=\frac{212+39}{212+39+61+22}=0.75149$
+
+```{r}
+mat_conf<-table(testy,Predicted=predicted_model)
+mat_conf
+```
+
+Una altre forma de fer-ho és amb el paquet 'gmodels'. Obtenim d'aquesta manera la matriu de confusió, la diferència és que en aquest cas es mostra la proporció de la cel·la respecte al total d'observacions. Gràcies a aquesta informació no només podem veure el nombre de prediccions correctes i incorrectes sinó també com es distribueixen aquestes prediccions entre les diferents categories. Aquesta informació pot donar una visió més clara de l'impacte de cada tipus de predicció respecte al total, cosa que és essencial per a avaluar la sensibilitat del model per identificar correctament les diferents categories de la variable objectiu.
+
+```{r}
+library(gmodels)
+```
+
+```{r}
+CrossTable(testy, predicted_model,prop.chisq  = FALSE, prop.c = FALSE, prop.r =FALSE,dnn = c('Reality', 'Prediction'))
+```
+
+Amb tots els resultats obtinguts fins ara podem treure les següents conclusions:
+
+ * *Precisió General:* Una precisió del ~75% ens indica que aproximadament tres de cada quatre prediccions són correctes. Depèn de la funció del model podria ser un bon resultat però tenint en compte que es vol utilitzar per a fer prediccions sobre donar o no prèstecs, la precisió hauria de ser més alta. Altres exemples on una precisió més alta seria recomenable seria per a aplicacions mèdiques o de seguretat.
+ 
+ * *Sensibilitat respecte a la default = 1:* La sensibilitat d'aquesta classe és de $212/234=0.906$, és a dir més o menys del 90%. Això vol dir que el model és bo alhora de detectar aquesta classe.
+ 
+ * *Sensibilitat respecte a la default = 2:* En canvi, en aquest cas el model no és tan bo, ja que si fem els càlculs obtenim $39/100=0.39$, és a dir, un 39%.
+
+**** 
+# Modificació de l'enfocament original
+****
+
+Per a intentar millorar el model farem un Random Forest, fent servir la llibreria *randomForest* de R. Aquest és un mètode basat en la combinació de múltiples arbres de decisió per a millorar la robustesa i la presició de la predicció del model. Primer carregarem la llibreria necessària i entrenarem el model.
+
+```{r}
+library(randomForest)
+
+# Entrenament del model
+model_randomForest <- randomForest(x = trainX, y = trainy)
+```
+
+El missatge obtingut ens dona la següent informació:
+
+ * la versió de randomForest utilitzada és la 4.7-1.1
+ * podem fer servir **rfNews()** per a veure les novetats, canvis o correcions de bugs
+ * les funcions **gridExtra** i **ggplot2** també les conté la llibreria **randomForest** i si no especifiquem el contrari, les utilitzarà per defecte.
+ 
+ Amb l'entrenament realitzat és el moment de evaluar el nou model obtingut i veure si hi ha hagut una millora respecte al primer.
+ 
+```{r}
+predicted_model_randomForest <- predict(model_randomForest, testX, type="class")
+print(sprintf("La precisió de l'árbre és: %.4f %%",100*sum(predicted_model_randomForest == testy) / length(predicted_model_randomForest)))
+```
+
+Mirem també la matriu de confusió,
+
+```{r}
+CrossTable(testy, predicted_model_randomForest,prop.chisq  = FALSE, prop.c = FALSE, prop.r =FALSE,dnn = c('Reality', 'Prediction'))
+```
+
+Podem veure que respecta al model original la precisió ha pujat d¡un 75% a un 78%, aquesta millora no és suficient per a la nostre aplicació. També ha millorat la sensibilitat de les dues classes però encara hi ha marge de millora en el model.
+
+## Modificació de paràmetres
+
+Podem modificar certs paràmetres per a l'entrenament del model, l'experimentació ens donarà diferents models i es pot arribar a obtenir un model millor. L'ajust de hyper-paràmetres és procés molt utilitzat en entrenament de Machine Learning o Deep Learning on, amb una mateixa estructura de model però amb diferents valors d'aquest paràmetres es poden obtindre models molt millors.
+
+En el nostre cas podem modificar el nombre d'arbres o la profunditat màxima dels arbres. A més, **randomForest** ens pot oferir informació sobre la importància de les diferents característiques en la preducció. 
+
+```{r}
+importance(model_randomForest)
+```
+El valor de **MeanDecreaseGini** representa com contribueix una variable a la homogeneïtat dels nodes dels arbres de decisió en el nostre bosc. Un valor alt implica que aquella variable és més important per a la classificació. És important remarcar que no són percentatges. Amb la informació obtinguda podem veure que les variables 'months_loan_duration', 'purpose', 'checking_balance', 'credit_history' i 'employment_lenght' són les que tenen els valors més alts i per tant, les més important per a les prediccions del model. És interessant veure que la importància de les variables en la predicció és diferent a la que haviem obtingut en apartats anteriors, on una de las variables més importants era 'property'.
+
+El següent pas en la millora del nostre model és la modificació dels paràmetres d'entrenament.Modificarem el nombre d'Arbres i farem servir ponderació de classes per donar representació per igual als dos casos.
+
+ * Nombre d'Arbres (ntree): Un nombre més alt d'arbres pot millorar la precisió, però també incrementerà el temps de càlcul i la memòria utilitzada. El valor per defecte es 500.
+ 
+```{r}
+set.seed(666)
+model_randomForest <- randomForest(x = trainX, y = trainy, ntree = 1000)
+predicted_model_randomForest <- predict(model_randomForest, testX, type="class")
+print(sprintf("La precisió de l'árbre amb ntree = 1000 és: %.4f %%",100*sum(predicted_model_randomForest == testy) / length(predicted_model_randomForest)))
+```
+ 
+
+```{r}
+set.seed(666)
+model_randomForest <- randomForest(x = trainX, y = trainy, ntree = 50)
+predicted_model_randomForest <- predict(model_randomForest, testX, type="class")
+print(sprintf("La precisió de l'árbre amb ntree = 60 és: %.4f %%",100*sum(predicted_model_randomForest == testy) / length(predicted_model_randomForest)))
+```
+ 
+Podem veure que en aquesta aplicació el nombre d'arbres no modifica molt la precisió del model, això és degut a que amb pocs arbres ja arribem al límit del model. Afegir-ne més no ens aportarà millores significatives (podria aportar fins i tot overfitting al model). Si fem un mostratge de l'hiperparàmetre ntree i en dibuixem la gràfica podem veure com, en aquesta aplicació, no es millora el model.
+
+```{r}
+set.seed(666)
+valors_ntree <- seq(10, 1000, by = 10)
+precisions <- numeric(length(valors_ntree))
+
+for (i in seq_along(valors_ntree)) {
+    model <- randomForest(x = trainX, y = trainy, ntree = valors_ntree[i])
+    predictions <- predict(model, testX)
+    precisions[i] <- sum(predictions == testy) / length(testy)
+}
+
+resultats <- data.frame(ntree = valors_ntree, accuracy = precisions)
+
+ggplot(resultats, aes(x = ntree, y = accuracy)) +
+    geom_line() +
+    xlab("Nombre d'Arbres (ntree)") +
+    ylab("Precisió") +
+    ggtitle("Precisió del Model de Random Forest en funció del Nombre d'Arbres")
+```
+ 
+Podem veure com la precisió del model oscil·la entre el 75% i el 79% tenint un màxim al voltant dels 450 arbres.
+
+```{r}
+index_max_precisio <- which.max(resultats$accuracy)
+max_precisio <- resultats$accuracy[index_max_precisio]
+ntree_max_precisio <- resultats$ntree[index_max_precisio]
+print(paste("La precisió màxima és", max_precisio, "amb", ntree_max_precisio, "arbres."))
+```
+
+ * Ponderació de Classes (classwt): Com en el nostre joc de dades les classes estan desequilibrades, farem servir aquest paràmetre per donar més pes a la classe menys representada.
+
+```{r}
+set.seed(666)
+class_weights <- c(1, 2)
+model_randomForest <- randomForest(x = trainX, y = trainy, ntree = 470, classwt = class_weights)
+predicted_model_randomForest <- predict(model_randomForest, testX, type="class")
+print(sprintf("La precisió de l'árbre és: %.4f %%",100*sum(predicted_model_randomForest == testy) / length(predicted_model_randomForest)))
+```
+
+Donant el doble de pes a la segona classe, el model es manté pràcticament igual. Però podem observar com ara el nombre d'Arbres que hem calculat abans, ja no és el millor valor, ja que al modificar un altre hiperparàmetre el model és diferent. 
+
+
+```{r}
+set.seed(666)
+class_weights <- c(1, 2)
+model_randomForest <- randomForest(x = trainX, y = trainy, ntree = 60, classwt = class_weights)
+predicted_model_randomForest <- predict(model_randomForest, testX, type="class")
+print(sprintf("La precisió de l'árbre és: %.4f %%",100*sum(predicted_model_randomForest == testy) / length(predicted_model_randomForest)))
+```
+
+Podem veure com buscar el millor valor d'un hiperparàmetre pot no ser bona idea, ja que al modificar-ne un altre, la feina que hem fet no servirà. És per això que la optimització de models mitjançant l'ajust de hiperparàmetres és una tasca molt complexa que moltes vegades requereix molt de prova i error. 
+
+*****
+# Resum i conclusions
+*****
+
+En aquesta pràctica hem vist com mitjançant l'ús d'arbres de decisió es poden obtindre models per a la classificació de dades. A més, hem vist la necessitat de dividir el joc de dades en subconjunts de testing i training, ja que si entrenem el model amb unes dades i l'avaluem amb les mateixes no podriem distingir el cas en el que del model ha après a classificar del que en el model ha memoritzat les dades. 
+
+La obtenció de models és una tasca complexa que requereix de moltes proves i anàlisi, a més, cada aplicació pot tindre paràmetres òptims diferents. Tot i això hem vist com hi ha tècniques que milloren un model, al comparar el model obtingut amb un únic arbre amb el model obtingut amb random Forest. Tot i que la millora del model no ha sigut significativa, no vol dir que en altres aplicacions no impliqui una millora important del model.
+
+Els models obtinguts tenen tots una precisió semblant al voltant del 75% que no es un bon resultat per al tipus d'aplicació que volem. Es podrien millorar els resultats afegint més dades, per exemple fent servir tècniques de Data Augmentation, molt usades en el camps del Deep Learning. També es podria buscar un altre model entrenat amb altres dades i aplicar tècniques de transfer learning per a partir d'un model pre-entrenat i a partir de allà ajustar-lo a les nostres dades (en parlen al paper 'Transfer Learning in Decision Trees', https://ieeexplore.ieee.org/document/4371047). 
+
+

@@ -1,0 +1,32 @@
+(venv) datasci@datasci:~/prog_datasci_2/PAC4/activity_4-master/data/src$ coverage report
+Name                                            Stmts   Miss  Cover
+-------------------------------------------------------------------
+functions/DescompressioLectura/llegir.py           26      0   100%
+functions/DescompressioLectura/test_llegir.py      30      0   100%
+-------------------------------------------------------------------
+TOTAL                                              56      0   100%
+
+
+(venv) datasci@datasci:~/prog_datasci_2/PAC4/activity_4-master/data/src$ coverage report
+Name                                                  Stmts   Miss  Cover
+-------------------------------------------------------------------------
+functions/DescompressioLectura/descomprimir.py           12      4    67%
+functions/DescompressioLectura/test_descomprimir.py      25      0   100%
+-------------------------------------------------------------------------
+TOTAL                                                    37      4    89%
+
+(venv) datasci@datasci:~/prog_datasci_2/PAC4/activity_4-master/data/src$ coverage report
+Name                                             Stmts   Miss  Cover
+--------------------------------------------------------------------
+functions/Processament/afegir_variable.py            6      0   100%
+functions/Processament/test_afegir_variable.py      12      0   100%
+--------------------------------------------------------------------
+TOTAL                                               18      0   100%
+
+(venv) datasci@datasci:~/prog_datasci_2/PAC4/activity_4-master/data/src$ coverage report
+Name                                              Stmts   Miss  Cover
+---------------------------------------------------------------------
+functions/Processament/crear_diccionari.py           11      0   100%
+functions/Processament/test_crear_diccionari.py      14      0   100%
+---------------------------------------------------------------------
+TOTAL                                                25      0   100%

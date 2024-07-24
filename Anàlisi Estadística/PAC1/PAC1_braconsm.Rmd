@@ -1,0 +1,386 @@
+---
+title: "Activitat 1: Exploració i preprocés de dades"
+author: "Marc Bracons Cucó"
+date: '`r format(Sys.Date(),"%e de %B, %Y")`'
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+# 1. Lectura de dades i examinació del tipus de variable
+
+## 1.1 Carregar el fitxer de dades
+
+Llegir el fitxer de dades i consultar el nom de les columnes del fitxer.
+
+```{r}
+# Càrrega del fitxer:
+dades <- read.csv('pisa2009-1.csv')
+
+# Consulta del nom de les columnes:
+names(dades)
+```
+
+## 1.2 Examinar el tipus de dades
+
+Indicar quines variables són de naturalesa numèrica, caràcter i categòrica. En cas que el tipus de variable que
+ha atorgat R no coincideixi amb el tipus que li correspondria, indicar de quines variables es tracta. Considereu
+que les variables binàries prenen valors 1 o 0. La transformació corresponent, si és necessària, s’aplicarà en els
+apartats següents, una vegada normalitzades les variables.
+
+```{r}
+# Tipus de variables:
+sapply(dades, class)
+```
+
+Podem veure que R ha detectat el tipus de variables com a "integer" o "character". A continuació mostrem la agrupació feta i en discutim els resultats.
+
+```{r}
+# Guardar informació del tipus de variables a 'tipus_variables':
+tipus_variables <- sapply(dades, class)
+
+# Agrupar en els dos grups detectats:
+int_var <- names(tipus_variables[tipus_variables == "integer"])
+char_var <- names(tipus_variables[tipus_variables == "character"])
+
+# Mostrar els resultats:
+cat("Variables Integer:\n", paste(int_var, collapse = ", "), "\n")
+cat("Variables de Caràcter:\n", paste(char_var, collapse = ", "), "\n")
+```
+
+Observem que la majoria de variables són de tipus "integer",  havent només tres de tipus "character". Tot i això, tenint en compte les descripcions de les variables donades a l'enunciat la classificació és la següent:
+
+- **Variables numèriques:** minutesPerWeekEnglish, studentsInEnglish, schoolSize, readingScore.
+
+- **Variables de naturalesa caràcter:** raceeth.
+
+- **Variables categòriques:** grade, male, preeschool, expectBachelors, motherHS, motherBachelors, motherWork, fatherHS, fatherBachelors, fatherWork, selfBornUS, motherBornUS, fatherBornUS, englishAtHome, computerForSchoolwork, minutesPerWeekEnglish, schoolHasLibrary, publicSchool, read30MinsADay, urban.
+
+En aquest joc de dades les variables binàries són de tipus categòric, ja que representen dos estats únics (representació de categories) i el seus valors no tenen un sentit numèric ni té sentit realitzar operacions matemàtiques amb elles.
+
+```{r}
+head(dades[c("read30MinsADay", "readingScore")], 3)
+```
+
+A més, si mirem tres mostres les variables que s'havien classificat com caràcter *read30MinsADay* i *readingScore*:
+
+- **read30MinsADay:** Hauria de ser de tipus "integer" si seguim la lògica de les demés variables categòriques.
+- **readingScore:** És de tipus numèric, s'ha etiquetat malament. 
+
+
+# 2. Normalizació de variables qualitatives (text)
+
+## 2.1 Variable raceeth
+
+Mostreu les categories de la variable raceeth. En cas d’inconsistències o errors, corregiu la informació. A
+continuació, mostreu el percentatge d’estudiants a cada categoria i dibuixeu un gràfic circular (pie chart).
+
+```{r}
+# Categories úniques de raceeth:
+categories_raceeth <- unique(dades$raceeth)
+print(categories_raceeth)
+```
+
+Observem que hi ha errors, per exemple la raça asiàtica està contemplada de tres formes diferents (Assian, Asian, Asiann), al igual que la blanca (White, white, whit). Per corregir-ho primer normalitzarem les cadenes de text a minúscules, després tractarem els casos en els que hi ha un caràcter de més o de menys.
+
+```{r}
+# Conversió a minúscules:
+dades$raceeth <- tolower(dades$raceeth)
+
+# Correcció errors:
+dades$raceeth[dades$raceeth == "assian"] <- "asian"
+dades$raceeth[dades$raceeth == "asiann"] <- "asian"
+dades$raceeth[dades$raceeth == "whit"] <- "white"
+
+# Mostrar de nou:
+categories_raceeth_corregides <- unique(dades$raceeth)
+print(categories_raceeth_corregides)
+```
+
+Un cop feta la correcció i normalització ja no hi detectem errors. Ara és el moment per visualitzar les dades.
+
+```{r}
+# Càlcul del percentatge d'estudiants
+taula_pct <- prop.table(table(dades$raceeth))*100
+taula_pct_ordenada <- sort(taula_pct, decreasing = TRUE)
+cat(paste(names(taula_pct_ordenada),": ", round(taula_pct, 2), "%", sep="", collapse = "\n"), "\n")
+
+# Gràfic
+pie(taula_pct, main = "Percentatge d'estudiants per raça/ètnia", labels = paste(names(taula_pct), ": ", round(taula_pct, 2), "%", sep=""))
+```
+
+Al joc de dades hi ha grups més representatius que d'altres, sent *white* la categoria predominant, amb més de la meitat dels estudiants, seguida per *hispanic* i *black*. Això pot ser a causa de la demografia de la població.
+
+
+# 3. Normalització i descripció de variables binàries
+
+El conjunt de dades conté un nombre elevat de variables binàries. Reviseu els seus valors i en cas d’errors
+o inconsistències, corregiu els valors a partir dels criteris indicats. A continuació, resumiu en una taula la
+proporció d’estudiants per als valors positius (1) i els valors negatius (0) d’aquestes variables. Interpreteu
+breument.
+
+**Requisits:**
+
+- La taula ha de contenir una variable a cada fila i quatre columnes: nombre d’estudiants amb valor 0 a la
+variable, nombre d’estudiants amb valor 1, proporció d’estudiants amb valor 0 i proporció d’estudiants
+amb valor 1.
+- Es recomana generar la taula de forma automàtica, sense haver de fer el càlcul manualment per a cada
+variable. Podeu fer servir funcions de la família *apply* per automatitzar aquest càlcul.
+
+
+Primer modificarem els valors de *read30MinADay* per a que tingui valos 0 i 1. A continuació guardarem a *taula_bin* les variables amb les que volem treballar.
+
+```{r}
+# Conversió 'read30MinsADay':
+dades$read30MinsADay <- ifelse(dades$read30MinsADay == "T", 1, ifelse(dades$read30MinsADay == "F", 0, NA))
+
+# Selecció de les variables:
+variables_bin <- c('male', 'preschool', 'expectBachelors', 'motherHS', 'motherBachelors', 
+                            'motherWork', 'fatherHS', 'fatherBachelors', 'fatherWork', 'selfBornUS', 
+                            'motherBornUS', 'fatherBornUS', 'englishAtHome', 'computerForSchoolwork', 
+                            'schoolHasLibrary', 'publicSchool', 'urban', 
+                            'read30MinsADay')
+
+taula_bin <- dades[, variables_bin]
+
+# Funció per calcular nombre i proporció de valors:
+calcular_proporcio <- function(variable) {
+  num_0 <- sum(variable == 0, na.rm = TRUE)
+  num_1 <- sum(variable == 1, na.rm = TRUE)
+  total <- length(na.omit(variable))
+  prop_0 <- num_0 / total
+  prop_1 <- num_1 / total
+  c(num_0 = num_0, num_1 = num_1, prop_0 = prop_0, prop_1 = prop_1)
+}
+
+# Creació de la taula resum i transformació a dataframe:
+taula_resum <- sapply(dades[variables_bin], calcular_proporcio)
+df_resum <- as.data.frame(t(taula_resum))
+rownames(df_resum) <- variables_bin
+
+# Mostrar:
+print(df_resum)
+```
+
+*(Nota: Per poder fer els calculs i no alterar els valors NA, aquests han sigut eliminats de la taula, però no del fitxer)*
+
+- **Gènere:** Hi ha un equilibri quasi igual entre estudiants de gènere masculí i no masculí.
+- **Educació prescolar i expectatives universitàries**: Les dues variables presenten una representació d'una categoria al voltant del 75%. Pot indicar el nivell de suport i aspiracions educatives de la població.
+- **Estudis dels pares:** El nivell d'estudis secundaris completats és alt tan en pares com en mares, en canvi, només el 30% dels pares i mares han completat uns estudis universitaris.
+- **Idioma i tecnologia:** Al voltant del 90% del estudiants parlen anglès i tenen accés a un ordinador.
+- **Escoles i entorn:** El 96% de les escoles tenen una llibreria a l'escola i el 93% són públiques. El 66% dels estudiants viuen en un entorn urbà.
+- **Hàbits de lectura:** El 70% dels estudiants no tenen per costum llegit per plaer 30 minuts al día.
+- **Naixements:** El 90% dels estudiants són nascuts a US, en canvi els pares i mares només ho són un 77%. Això ens indica una proporció dels estudiants són de segona generació, nascuts a US de pares immigrants.
+
+
+# 4. Normalització de variables quantitatives
+
+## 4.1 Variable readingScore
+
+Reviseu els valors de la variable readingScore i verifiqueu que estiguin dins dels marges esperats. Si hi ha
+algun valor erroni o molt extrem, substituir per NA. Mostreu un gràfic de tipus boxplot per visualitzar la
+distribució d’aquesta variable. Interpreteu el resultat.
+
+En l'apartat 1.2 hem vist que la variable readingScore era de tipus caràcter quan ha de ser de tipus numèric, així que primer en farem la correcció i l'estudi.
+
+```{r}
+# Conversió a valors numèrics:
+dades$readingScore <- as.numeric(dades$readingScore)
+
+# Resum de la variable:
+resum_readingScore <- summary(dades$readingScore)
+iqr_readingScore <- IQR(dades$readingScore, na.rm = TRUE)
+
+# Mostrar resultats:
+print(resum_readingScore)
+print(paste("Abast Interquartílic (IQR):", iqr_readingScore))
+
+# boxplot de readingScore:
+boxplot(dades$readingScore, 
+        main = "Boxplot de readingScore", 
+        ylab = "Puntuació", 
+        xlab = "Estudiants")
+
+# Línia horitzontal amb la mediana
+abline(h = median(dades$readingScore, na.rm = TRUE), lwd = 2)
+```
+
+- **Primer Quartil:**: El 25% dels estudiants tenen una puntuació inferior a 431.7.
+- **Mediana:**: El valor central de la distribució és 499.7, és a dir, la meitat dels estudiants tenen puntuacions per sota d'aquest valor i l'altre meitat per sobre. Notar que es tracta pràcticament de la meitat de la màxima puntuació.
+- **Mitjana:** La mijtana és 497.9, un valor molt pròxim a la mediana.
+- **Tercer Quartil:** El 75% dels estudiants tenen puntuacions per sota de 566.2.
+- **Valors atípics:** A la part inferior hi podem veure cercles que representen valors atípics, és a dir, puntiacions de lectura que estan fora del rang definit per 1.5 vegades l'IQR des del primer quartil. Aquests valors poden ser errors en les dades o estudiants amb dificultats de lectura.
+
+## 4.2 Variable grade
+
+Mostreu visualment la distribució de la variable grade (curs). A continuació, reviseu si els valors de la variable
+grade estan dins dels marges raonables. Per a la mostra d’estudi, composta per estudiants de 15 anys, es
+correspondria al desè curs. Hi poden haver casos d’estudiants que estiguin en cursos més avançats o en cursos
+inferiors. Si hi ha un valor extrem o erroni, s’ha de substituir per NA.
+
+```{r}
+hist(dades$grade, breaks = max(dades$grade) - min(dades$grade), 
+     main = "Distribució de grade", 
+     xlab = "grade", 
+     ylab = "Nombre d'Estudiants")
+```
+
+Podem observar que la majoria d'alumnes estan al curs que els hi pertoca, tot i això hi ha alumnes amb cursos enderrerits i avançats. Crida l'atenció que hi ha més alumnes en cursos avançats que endererits. Finalment, comentar que hi ha unes poques mostres on el curs és molt avançat. A continuació mirarem quants casos n'hi ha i decidirem com els tractarem.
+
+```{r}
+# Càlcul del valor màxim
+max_grade <- max(dades$grade)
+
+# Comptem el nombre de mostres amb valor màxim
+count_max_grade <- sum(dades$grade == max_grade, na.rm = TRUE)
+
+count_max_grade
+```
+
+Hi ha 4 casos en els que l'alumne està dos cursos avançat a la resta dels alumnes. Aquests casos els contemplarem com extrems i els substituïrem per valors NA.
+
+```{r}
+dades$grade[dades$grade == max_grade] <- NA
+summary(dades$grade)
+```
+
+Un cop aplicats els canvis aprofitem per veure un resum del nostre joc de dades per veure que, efectivament, s'han aplicat els canvis i el valor màxim de grade és 11.
+
+## 4.3 Variable schoolSize
+
+Mostreu visualment la distribució de la variable schoolSize. Si hi ha valors erronis, substituïu per NA. La
+imputació es farà més endavant.
+
+```{r}
+hist(dades$schoolSize, 
+     main = "Histograma de schoolSize", 
+     xlab = "Mida de l'Escola")
+```
+
+Observem en el gràfic que la majoria de les escoles tenen una mida que oscil·la al voltant dels 1000 estudiants. A més, podem veure que la distribució es concentra més als rangs menors, cosa que ens indica que l'habitual són les coles més petites. També hi podem observar una cua cap a la dreta amb escoles amb major nombre d'estudiants, tot i que són menys freqüents. Finalment notar que hi ha mostres entre 6000 i 7000 alumnes, no tenim prou informació per saber si es tracta d'un error o un valor atípic però el substituïrem per un valor NA, ja que s'allunya molt de la resta de les dades. 
+Per a fer-ho, posarem el punt de tall a les escoles amb més de 4000 alumnes.
+
+```{r}
+dades$schoolSize[dades$schoolSize > 4000] <- NA
+summary(dades$schoolSize)
+```
+
+Al igual que amb la variable anterior, aprofitem per veure un resum i comprovar si els canvis s'han realitzat correctament.
+
+
+# 5. Imputació
+
+En aquest apartat, farem la imputació sobre els valors perduts de la variable schoolSize. Apliqueu imputació
+per veïns més propers, utilitzant la distància de Gower, considerant en el còmput dels veïns més propers
+les variables numèriques. Per realitzar aquesta imputació, es pot fer servir la funció “kNN” de la llibreria
+VIM amb un nombre de veïns igual a 5. Demostreu que la imputació s’ha realitzat correctament, visualitzant
+algunes de les dades afectades per la imputació.
+Finalment, analitzeu des d’un punt de vista crític el procés d’imputació realitzat.
+
+```{r}
+if (!require("VIM", character.only = TRUE)) {
+  install.packages("VIM", dependencies = TRUE)
+  library(VIM)
+}
+```
+
+Un cop carrega i instal·lada (en cas que sigui necessari) la llibreria, farem la imputació. Com només treballarem amb les variables numèriques primer hem de excloure la columna **raceeth** del nostre anàlisi. A més, per a poder reproduïr els càlculs i no haver de modificar l'informe, fixarem un **seed**. 
+
+```{r}
+dades_num <- dades[, setdiff(names(dades), "raceeth")]
+
+set.seed(42)
+dades_imputades <- kNN(dades_num, variable = "schoolSize", k = 5, metric = "gower")
+
+summary(dades_imputades$schoolSize)
+```
+
+Ara és el moment de visualitzar algunes de les imputacions realitzades.
+
+```{r}
+# Obtenció dels index amb valors NA del df original
+na_index <- which(is.na(dades$schoolSize))
+
+comparativa <- data.frame(
+  Original = dades$schoolSize[na_index],
+  Imputades = dades_imputades$schoolSize[na_index]
+)
+
+head(comparativa, 5)
+```
+
+El haver fet servir la distància de Gower per a la imputació ens ha permès fer servir les variables categòriques que amb altre tipus de distància no tindrien sentit. El cost computacional ha sigut petit ja que només hem considerat *k=5*, si es volgués ser més precís caldria augmentar el valor de *k* tot i que impliqui un cost computacional més elevat.
+
+
+# 6. Mesures característiques de les variables numèriques
+
+Calculeu les mesures de tendència central i dispersió, tant robustes com no robustes, de les variables
+quantitatives numèriques grade, minutesPerWeekEnglish, studentsInEnglish, schoolSize i readingScore. Es presentaran dues taules, una amb les mesures de tendència central i una altra amb les mesures de dispersió. A la taula de tendència central, mostreu la mitjana, mediana, i mitjana retallada al 5%. A la taula de dispersió,
+mostreu la desviació estàndard, el rang interquartílic i la desviació absoluta respecte de la mitjana.
+
+**Requisits:**
+
+- Igual que anteriorment, realitzeu aquest càlcul sense haver de calcular la informació de cada variable
+per separat. Feu servir les funcions de la família *apply*.
+- Per practicar el desenvolupament de funcions en R, us demanem que implementeu la funció que calcula
+la desviació estàndard i feu servir aquesta funció en lloc de la funció *sd* que proporciona R.
+
+**Nota:**
+
+- Com que no hem realitzat imputació per a totes les variables numèriques, si existeixen NAs en
+algunes variables, podeu ignorar aquests valors per fer aquests càlculs. Podeu fer servir el paràmetre
+*na.rm=TRUE*.
+
+Primer crearem la funció personalitzada per a la **Desviació Estàndard**, que es defineix com
+
+$sd = \sqrt{\frac{1}{n-1}\sum(x_i-\bar{x})^2}$
+
+```{r}
+# Funció custom per calcular la desviació estàndard
+custom_sd <- function(x, na.rm = FALSE) {
+  if (na.rm) {
+    x <- x[!is.na(x)]
+  }
+  n <- length(x)
+  mean_x <- mean(x)
+  sqrt(sum((x - mean_x)^2) / (n - 1))
+}
+```
+
+A continuació calcularem les mesures de tendència central i dispresió. Farem servir *trim=0.05* per retallar al 5%.
+
+```{r}
+variables <- c("grade", "minutesPerWeekEnglish", "studentsInEnglish", "schoolSize", "readingScore")
+
+tendencia_central <- sapply(dades_imputades[variables], function(x) {
+  c(Mitjana = mean(x, na.rm = TRUE),
+    Mediana = median(x, na.rm = TRUE),
+    `Mitjana Retallada` = mean(x, trim = 0.05, na.rm = TRUE))
+})
+
+dispersio <- sapply(dades_imputades[variables], function(x) {
+  c(`Desviació Estàndard` = custom_sd(x, na.rm = TRUE),
+    `Rang Interquartílic` = IQR(x, na.rm = TRUE),
+    `Desviació Absoluta` = mad(x, na.rm = TRUE))
+})
+
+print("Taula de Tendència Central:")
+print(tendencia_central)
+
+print("Taula de Dispersió:")
+print(dispersio)
+```
+
+# 7. Arxiu final
+
+Un cop realitzat el preprocessament sobre el fitxer, desar el resultat de les dades en un fitxer csv anomenat pisa_clean.csv.
+
+Finalment només hem de transformar el nostre data frame *dades_imputades* a un fitxer csv.
+
+```{r}
+write.csv(dades_imputades, file = "pisa_clean.csv", row.names = FALSE)
+```
+
+

@@ -1,0 +1,501 @@
+---
+title: "Anàlisi de Factors Clau que Influeixen en el Preu dels Habitatges a Washington"
+author: "Marc Bracons Cucó"
+date: '`r format(Sys.Date(),"%e de %B, %Y")`'
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+
+
+# 1. Introducció
+
+En aquest estudi usarem el conjunt de dades **Casas** sobre les característiques i preus d’habitatges de l’estat de Washington en USA. S’han recollit dades dels habitatges, com a superfície útil, nombre de banys i lavabos, superfície de la parcel·la, etc,. També es té informació sobre variables de l’entorn, com a vistes i proximitat dels veïns. L’objectiu principal d’aquest estudi és esbrinar quins són els factors que més influeixen a l’hora de determinar el preu d’una casa. Aquest tipus d’anàlisi és molt útil tant per a les agències, com per al mercat immobiliari en general, per a poder predir l’evolució del preu dels habitatges.
+
+L’arxiu conté aproximadament 21600 registres i 16 variables. Les principals variables són:
+
+ * date: Data de venda
+ * price: Preu de venda
+ * bedrooms: Nombre d’habitacions
+ * bathrooms: Nombre de banys/lavabos
+ * sqtf_living: Superfície habitable (en peus al quadrat)
+ * sqft_lot: Superfície de la parcel·la (en peus al quadrat)
+ * floors: Nombre de plantes
+ * waterfront: Indica si l’habitatge té accés a un llac
+ * view: Tipus de vista (variable numèrica)
+ * condition: Estat de l’habitatge, codificada de l’1 al 5, sent 1 Molt mala i 5 Molt bona
+ * sqft_basement: Superfície del soterrani (en peus al quadrat)
+ * yr_built: Any de construcció de l’habitatge
+ * yr_renovated: Any de renovació de l’habitatge
+ * sqft_living15: Superfície habitable mitjana dels 15 veïns més pròxims
+ * sqft_lot15: Superfície de la parcel·la mitjana dels 15 veïns més pròxims.
+
+Primer s’estudiaran les possibles relacions lineals entre el preu de l’habitatge i les diferents variables independents. En la segona part de l’activitat es buscaran els possibles factors que intervenen perquè un habitatge tingui un preu més elevat i sigui considerada de luxe. Segons les dades d’aquest estudi el preu mitjà seria de 450000$.
+
+
+
+# Regressió Lineal
+
+
+## Preparació de les dades
+
+```{r}
+cases <- read.csv("Casas.csv")
+head(cases)
+```
+
+Abans de començar amb l’anàlisi es passaran les variables de superfície mesures en peus quadrats a metres quadrats i els dòlars a euros. Això es fa tenint en compte les conversions següents:
+
+$1\_peusquadrats=0.0929\_metresquadrats$
+
+$1\_dolar=0.93\_euros$
+
+```{r}
+# Constants de conversió
+peus_a_metres <- 0.0929
+dolars_a_euros <- 0.93
+
+# Conversió de superfície de peus quadrats a metres quadrats i canvi de noms
+cases$m2_living <- cases$sqft_living * peus_a_metres
+cases$m2_lot <- cases$sqft_lot * peus_a_metres
+cases$m2_basement <- cases$sqft_basement * peus_a_metres
+cases$m2_living15 <- cases$sqft_living15 * peus_a_metres
+cases$m2_lot15 <- cases$sqft_lot15 * peus_a_metres
+
+# Eliminem les columnes originals en peus quadrats
+cases$sqft_living <- NULL
+cases$sqft_lot <- NULL
+cases$sqft_basement <- NULL
+cases$sqft_living15 <- NULL
+cases$sqft_lot15 <- NULL
+
+# Conversió de dòlars a euros i canvi de nom de la columna
+cases$price_euros <- cases$price * dolars_a_euros
+cases$price <- NULL
+
+# Mostrem les primeres files per verificar les conversions i els nous noms de les columnes
+head(cases[, c("m2_living", "m2_lot", "m2_basement", "m2_living15", "m2_lot15", "price_euros")])
+```
+
+A continuació revisem la naturalesa de cadascuna de les variables a estudiar, també comprovarem si és necessari algun canvi.
+
+```{r}
+str(cases)
+```
+Observem que s'ha de canviar el tipus de la variable **date** a *Date* i el de **waterfront**, **view** i **condition** a *factor*.
+
+```{r}
+cases$date <- as.Date(cases$date, format="%Y%m%dT%H%M%S")
+ cases$waterfront <- as.factor(cases$waterfront)
+ cases$view <- as.factor(cases$view)
+ cases$condition <- as.factor(cases$condition)
+```
+
+Tornem a mirar el tipus de variables per verificar que els canvis s'han dut a terme correctament.
+
+```{r}
+str(cases)
+```
+
+## Estudi de correlació lineal
+
+Una vegada efectuades les conversions, és el moment de calcar la correlació lineal entre totes les variables de l’estudi, exceptuant date y zipcode. Una vegada calculades les correlacions, mostrarem, en forma de matriu, només aquelles que tinguin un coeficient de correlació superior a 0.2. A més les ordenarem de manera decreixent, és a dir del valor més alt de r, al més baix, per facilitar-ne la lectura.
+
+A part de les columnes a ignorar mencionades anteriorment, tampoc hi posem les de tipus factor. Per a la representació, eliminem les correlacions simètriques $corr(a,b)=corr(b,a)$, deixant només el càlcul d'una de les parelles. Tampoc mostrarem les correlacions d'una variable amb si mateixa ($corr(a,a)$).
+
+```{r}
+library(reshape2)
+
+columnes_a_ignorar <- c("date", "zipcode", "waterfront", "view", "condition")
+cases_filtrades <- cases[, !(names(cases) %in% columnes_a_ignorar)]
+
+# matriu_correlacio
+matriu_correlacio <- cor(cases_filtrades)
+
+# Filtrem valor absolut superior a 0.2
+matriu_correlacio[abs(matriu_correlacio) < 0.2] <- NA
+
+correlacio_melted <- melt(matriu_correlacio, na.rm = TRUE)
+correlacio_melted <- correlacio_melted[correlacio_melted$Var1 != correlacio_melted$Var2, ]
+correlacio_melted <- correlacio_melted[!duplicated(t(apply(correlacio_melted[, c("Var1", "Var2")], 1, sort))), ]
+correlacio_melted <- correlacio_melted[order(-abs(correlacio_melted$value)),]
+
+print(correlacio_melted)
+```
+
+A la vista dels resultats podem treure tres conclusions:
+
+ * **Factors clau relacionats amb la mida:** Les superfícies habitables i del terreny, tant dels habitatges com dels veïns, mostren fortes correlacions positives amb altres variables com el nombre de banys i el preu de l'habitatge.
+
+ * **Importància de les característiques del barri:** Les característiques del barri, com la superfície habitable mitjana dels veïns, també tenen una influència significativa en el preu de l'habitatge
+ 
+ * **Interrelacions entre característiques:** Variables com el nombre de banys i habitacions estan moderadament correlacionades, indicant que aquestes característiques solen variar conjuntament.
+
+
+## Generació dels conjunts d’entrenament i de test
+
+Per a poder estimar de forma més objectiva la precisió del model lineal, separarem el conjunt de dades en dues parts: el conjunt d’entrenament (training) i el conjunt de prova (testing). Ajustarem el model de regressió lineal amb el conjunt d’entrenament, i avaluarem la precisió amb el conjunt de prova.
+
+
+```{r}
+# Fixem una llavor per poder reproduïr els resultats
+set.seed(42)
+
+# Calculem la mida de la mostra d'entrenament
+mida_entrenament <- floor(0.8 * nrow(cases))
+
+index_aleatori <- sample(seq_len(nrow(cases)), size = mida_entrenament)
+
+# Dividim el conjunt de dades
+conjunt_entrenament <- cases[index_aleatori, ]
+conjunt_prova <- cases[-index_aleatori, ]
+```
+
+
+## Estimació del model de regressió lineal
+
+A continuació estimarem per mínims quadrats ordinaris un model lineal que expliqui el preu dels habitatges en funció de totes les variables utilitzades per a calcular les correlacions en l’apartat anterior.
+
+```{r}
+conjunt_entrenament_filtrat <- conjunt_entrenament[, !(names(conjunt_entrenament) %in% columnes_a_ignorar)]
+
+# Construïm el model utilitzant el conjunt d'entrenament
+model <- lm(price_euros ~ ., data = conjunt_entrenament_filtrat)
+
+summary(model)
+```
+
+ * **Intercept:* És un preu estimat si totes les altres variables són 0. Simplement, és un punt d'inici del model, no té sentit en el context del mòn real.
+ 
+ * **bedrooms:* Sorprenenment té un coeficient negatiu, és a dir, a mesura que el nombre d'habitacions augmenta, el preu mutjà de l'habitatge baixa per cada habitació. Pot ser que el fet de tindre més habitacions estigui correlat amb altres factors que disminueixen el preu.
+ 
+ * **bathrooms:* Cada bany addicional augmenta el preu. Es valora positivament tindre més banys als habitatges.
+ 
+ * **floors:* Cada planta addicional incrementa el preu de l'habitatge.
+ 
+ * **yr_built:* Cada any addicional des de la construcció de l'habitatge disminueix el preu. Això indica que les cases més antigues tendeixen a ser menys valuoses.
+ 
+ * **yr_renovated:* Cada any addicional des de la renovació incrementa lleugerament el preu de l'habitatges. La renovació recent té un efecte lleugerament positiu en el valor.
+ 
+ * **m2_living:* Cada metre quadrat addicional d'àrea habitable incrementa el preu en 2.415 euros, un dels factors més influents en el preu.
+ 
+ * **m2_lot:* L'àrea de la parcel·la no té un efecte significatiu en el preu (p-value = 0.343).
+ 
+ * **m2_basement:*  L'àrea del soterrani tampoc té un efecte significatiu en el preu (p-value = 0.239).
+ 
+ * **m2_living15:* Cada metre quadrat addicional d'àrea habitable mitjana dels 15 veïns més propers incrementa el preu de l'habitatge. Això indica que viure en una zona amb cases grans tendeix a incrementar el valor de l'habitatge.
+ 
+ * **m2_lot15:* Cada metre quadrat addicional de la parcel·la mitjana dels 15 veïns més propers disminueix el preu de l'habitatge.
+ 
+S'ha de tindre en compte els valors 0.5711 de **Multiple R-squared** i 0.5709 de **Adjusted R-suqared**, que ens indiquen que el model explica un 57% de la variació en els preus. No és un valor molt alt així que pot ser que hi hagi altres factors importants a tindre en compte. 
+
+### Comprovació de col·linealitat
+
+Una vegada ajustat el model comprovarem la presència o no de col·linealitat. A la vista dels resultats, decidirem si es pot excloure alguna variable del model. 
+
+Per a la comprovació de la col·linealitat, compararem els valors del factor de inflacció de la variància (FIV), amb el seu equivalent en el model ajustat. Els valors FIV majors que aquesta quantitat impliquen que la relació entre les variables explicatives és major que la que existeix entre la resposta i els predictors, i per tant donen indicis de  multicol·linealitat.
+
+
+```{r}
+library(car)
+
+vif_values <- vif(model)
+print(vif_values)
+```
+
+Tenint en compte que el coeficient de determinació ($R^2$) del model complet és 0.5711, podem calcular el seu equivalent en el model ajustat:
+
+$FIV_{límit}=\frac{1}{1-R^2}=\frac{1}{1-0.5711}=2.332$
+
+Els valors del FIV de les variables oscil·len entre 1.1 i 5, sient aquest últim el de **m2_living**, un valor per sobre del límit calculat, així doncs, hi ha una forta colinealitat amb altres variables.
+
+Altres variables com **bathrooms** o **m2_living15** estan per sobre del límit, i eliminar-les, podria afectar negativament el model. 
+
+
+## Diagnosi del model
+
+Per a la diagnosi es tria el model final construït en l’apartat anterior, una vegada decidit si s’elimina o no alguna variable per problemes de col·linealitat. Generarem un histograma amb els residus ( valors observats menys els predits pel model) i posteriorment altres dos gràfics: un amb els valors ajustats enfront dels residus (que ens permetrà veure si la variància és constant) i el gràfic quantil-quantil que compara els residus del model amb els valors d’una variable que es distribueix normalment (QQ plot).
+
+```{r}
+# Generem prediccions i residus
+residus <- residuals(model)
+
+# Histograma dels residus
+hist(residus, breaks = 30, main = "Histograma dels Residus", xlab = "Residus")
+```
+
+A l'histograma dels residus hi veiem que la majoria dels residus es concentren al voltant del zero. Es pot veure una distribució lleugerament asimètrica. Existeixen valors extrems tant al costat positiu com al negatiu, pot ser que hi hagi alguns outliers. Tot i no ser perfecte, la forma recorda a la d'una distribució normal. 
+
+```{r}
+# Gràfic de valors ajustats vs. dels residus
+plot(model$fitted.values, residus, 
+     main = "Valors Ajustats vs. dels Residus",
+     xlab = "Valors Ajustats",
+     ylab = "Residus")
+abline(h = 0, col = "red")
+```
+
+En aquesta gràfica podem veure que els residus no estan distribuïts de manera completament aleatòria al voltant de la línia d'alçada 0. Podem veure que per a valor més petits les mostres estan més agrupades i quan aquests augmenten, la dispersió també ho fa. Això es deu al fet que la variància dels errors no és constant al llarg de les prediccions fetes, cosa que pot afectar a la precisió del model. 
+
+```{r}
+# Gràfic Quantil-Quantil
+qqnorm(residus, main = "Gràfic Quantil-Quantil dels Residus")
+qqline(residus, col = "red")
+```
+
+El gràfic Quantil-Quantil ens mostra que els residus segueixen una línia recta, tot i haver-hi desviacions significatives als extrems. Per tant, els residus no segueixen de forma estricta una distribució normal. 
+
+Amb tota aquesta informació podem dir que els residus no segueixen exactament una distribució normal i que la variància dels residus no és constant, cosa que pot afectar la fiabilitat de les estimacions. 
+
+
+## Predicció del model
+
+Segons el model final, calcularem les prediccions del preu que tindria un habitatge, utilitzant la base de dades de testing. Representarem els valors predits enfront els valors observats. Avaluarem la precisió del model mitjançant l’arrel quadrada de l’error quadràtic mitjà (RMSE).
+
+```{r}
+# Càlcul de les prediccions
+conjunt_prova_filtrat <- conjunt_prova[, !(names(conjunt_prova) %in% columnes_a_ignorar)]
+prediccions <- predict(model, conjunt_prova_filtrat)
+
+# Gràfic de valors predits vs. dels valors observats
+plot(conjunt_prova$price_euros, prediccions,
+     main = "Valors Predits vs. dels Valors Observats",
+     xlab = "Valors Observats",
+     ylab = "Valors Predits")
+abline(0, 1, col = "red")
+
+# RMSE
+error <- conjunt_prova$price_euros - prediccions
+rmse <- sqrt(mean(error^2))
+print(paste("RMSE: ", rmse))
+```
+
+El gràfic ens mostra la relació entre les prediccions i els valors observats. Els punts ideals són els que estan sobre la línia vermella ($y=x$), que indicaria una predicció perfecta.
+
+Hi podem observar una dispersió considerable al voltant de la línia de referència, sobretot a mesura que els valors observats augmenten. És a dir, el model té problemes en fer prediccions sobre els habitatges més cars. Sembla que hi ha més punts per sota de la línia de referència, indicant que el model tendeix a subestimar el preu de l'habitatge (accentuat encara més en els habitatges grans). Finalment, hi podem veure outliers, tant en valors observats com en prediccions.
+
+Pel que fa al RMSE, el seu valor calculat és 236655, cosa que ens indica el valor en què, en mijtana les prediccions del model es desvien dels valors observats. Tenint en compte que el valor mitja del conjunt és al voltant dels 450000€, això suposa un error molt alt (>50%). Per tant, podem dir que el model no és molt precís. 
+
+
+
+# Regressió logística
+
+
+## Preparació de les dades
+
+Es vol estudiar quins són els factors que més influeixen en el preu de l’habitatge en l’estat de Washington.
+
+Per a això, primer crearem una nova variable dicotòmica anomenada **price_re**. Aquesta nova variable està relacionada amb els valors de la variable *price_eur*. La codificarem de la manera següent: *“preu inferior a 500000 euros” pren el valor 0* i *“preu superior o igual a 500000” el valor 1*. Per al model de regressió logística, es prendrà com a variable dependent *price_re*.
+
+De manera anàloga als models lineals, separarem el conjunt de dades en dues parts: el conjunt d’entrenament (training2) i el conjunt de prova (testing2). Ajustarem el model de regressió logística amb el conjunt d’entrenament, i avaluarem la precisió amb el conjunt de prova.
+
+```{r}
+# Creació de la variable dicotòmica price_re
+cases$price_re <- ifelse(cases$price_euros >= 500000, 1, 0)
+```
+
+```{r}
+# Separem el conjunt de dades en entrenament i prova (80% i 20%)
+set.seed(42)
+
+mida_entrenament2 <- floor(0.8 * nrow(cases))
+
+index_aleatori2 <- sample(seq_len(nrow(cases)), size = mida_entrenament2)
+
+conjunt_entrenament2 <- cases[index_aleatori2, ]
+conjunt_prova2 <- cases[-index_aleatori2, ]
+```
+
+## Estimació del model de regressió logística
+
+Prenent com a base, training2, estimem el model de regressió logística sent la variable dependent **price_re** i prenent com a variables explicatives les triades en el model de regressió lineal final. Tenim en compte que la variable **price_eur** sense recodificar cal eliminar-la com a variable explicativa. A més la nova variable **price_re**, com les variables **view** i **waterfront** han de ser transformades a factor. A la vista dels resultats, decidirem si eliminar o no algun dels factors del model. A aquest model triat, se’n dirà model final.
+
+```{r}
+# Transformem les variables en factors
+conjunt_entrenament2$price_re <- as.factor(conjunt_entrenament2$price_re)
+conjunt_entrenament2$view <- as.factor(conjunt_entrenament2$view)
+conjunt_entrenament2$waterfront <- as.factor(conjunt_entrenament2$waterfront)
+
+# Filtrem les columnes no desitjades (incloem price_euros)
+columnes_a_ignorar_logistic <- c("price_euros", "date", "zipcode", "condition")  
+conjunt_entrenament_filtrat2 <- conjunt_entrenament2[, !(names(conjunt_entrenament2) %in% columnes_a_ignorar_logistic)]
+```
+
+```{r}
+# Ajust del model de regressió logística
+model_logistic <- glm(price_re ~ ., data = conjunt_entrenament_filtrat2, family = binomial)
+
+summary(model_logistic)
+```
+
+Aquest model ens mostra que els factors que més influeixen en la probabilitat que el preu d'un habitatge sigui superior a 500,000€ són el nombre d'habitacions, banys, plantes, l'any de construcció, la superfície habitable i les vistes. Les variables **waterfront** i **yr_renovated** no són significatives en aquest model i poden ser eliminades.
+
+
+## Càlcul de les OR (Odss-Ràtio)
+
+A continuació volem resumir quines de les variables explicatives del model de regressió logística final generat en l’apartat anterior poden considerar-se factors de risc o protecció. Ho farem calculant les OR corresponents, que ens permeten entendre l'impacte de cada variable en la probabilitat que el preu de l'habitatge sigui superior a 500000€. Si el seu valor es superior a 1, indica un factor de rics (és a dir, augmenta la probabilitat que el preu sigui superior als 50000€).
+
+```{r}
+model_logistic_final <- glm(price_re ~ bedrooms + bathrooms + floors + view + yr_built + m2_living + m2_lot + m2_basement + m2_living15 + m2_lot15, 
+                            data = conjunt_entrenament_filtrat2, family = binomial)
+
+summary(model_logistic_final)
+```
+
+```{r}
+# Calculem les OR
+exp_coef <- exp(coef(model_logistic_final))
+exp_confint <- exp(confint(model_logistic_final))
+
+or_df <- data.frame(
+  Variable = names(exp_coef),
+  OR = exp_coef
+)
+
+print(or_df)
+```
+
+Les variables que tenen un OR superior a 1 són bathrooms, floors, view, m2_living, m2_basement, i m2_living15. En canvi bedrooms i yr_built tenen un OR menor a 1. Finalment, m2_lot i m2_lot15 són pràcticament neutres.
+
+
+## Matriu de confusió
+
+A continuació analitzem la precisió del model final triat, comparant la predicció del model contra el conjunt de prova (testing). S’assumirà que la predicció del model és 1, habitatges amb preu superior o igual a 500000 euros, si la probabilitat del model de regressió logística és superior o igual a 0.5 i 0 en cas contrari. Analitzarem la matriu de confusió i les mesures de sensibilitat i especificitat.
+
+```{r}
+# Filtrem
+conjunt_prova2$view <- as.factor(conjunt_prova2$view)
+conjunt_prova_filtrat2 <- conjunt_prova2[, !(names(conjunt_prova2) %in% columnes_a_ignorar_logistic)]
+
+# Generem les prediccions
+prediccions_prob <- predict(model_logistic_final, conjunt_prova_filtrat2, type = "response")
+prediccions_class <- ifelse(prediccions_prob >= 0.5, 1, 0)
+
+# Matriu de confusió
+matriu_confusio <- table(conjunt_prova2$price_re, prediccions_class, dnn = c("Observat", "Predicció"))
+print(matriu_confusio)
+```
+
+La matiru de confusió ens proporciona la següent informació:
+
+ * True Positives (TP): 1059
+ * True Negatives (TN): 2430
+ * False Positives (FP): 317
+ * False Negatives (FN): 517
+
+```{r}
+# Calculem de la sensibilitat i l'especificitat
+true_positives <- matriu_confusio[2, 2]
+true_negatives <- matriu_confusio[1, 1]
+false_positives <- matriu_confusio[1, 2]
+false_negatives <- matriu_confusio[2, 1]
+
+sensibilitat <- true_positives / (true_positives + false_negatives)
+especificitat <- true_negatives / (true_negatives + false_positives)
+
+print(paste("Sensibilitat: ", sensibilitat))
+print(paste("Especificitat: ", especificitat))
+```
+Els valors de sensibilitat i especificitat ens indiquen que el model identifica  correctament el 67% dels habitatges amb preu superior o igual als 500000€ (deixant un 32.8% d'habitatges cars identificats malament). En canvi, el model pot identificar  correctament el 88.5% dels habitatges per sota del preu llindar.
+
+
+## Predicció
+
+Segons el model final, prenent com a base training2, calcularem la probabilitat que un habitatge amb les mateixes característiques que la registrada en la tercera fila de la base de dades, tingués un preu superior o igual a 500000 euros.
+
+```{r}
+# Obtenir la tercera fila del joc de dades
+tercera_fila <- cases[3, ]
+
+print(tercera_fila)
+```
+
+```{r}
+tercera_fila_filtrada <- tercera_fila[, !(names(tercera_fila) %in% columnes_a_ignorar_logistic)]
+tercera_fila_filtrada$view <- as.factor(tercera_fila_filtrada$view)
+
+# Prdicció de la probabilitat
+probabilitat <- predict(model_logistic_final, tercera_fila_filtrada, type = "response")
+print(paste("La probabilitat que l'habitatge tingui un preu superior o igual a 500,000 euros és: ", probabilitat))
+```
+
+
+## Bondat de l’ajust
+
+a) Avaluarem la bondat de l’ajust, mitjançant la devianza. Perquè el model final sigui bo la devianza residual ha de ser menor que la devianza nul·la. En aquest cas el model prediu la variable dependent amb major precisió.
+
+b) Avaluarem l’eficàcia del model segons el test Chi-quadrat. En aquest cas el valor de l’estadístic Chi-quadrat observat és igual a la diferència de devianzas (nul·la-residual). 
+Calcularem la probabilitat associada a l’estadístic del contrast utilitzant la funció **pchisq**.
+
+```{r}
+# Obtenim les devianzas del model final
+null_deviance <- model_logistic_final$null.deviance
+residual_deviance <- model_logistic_final$deviance
+
+# Calculem la diferència entre la devianza nul·la i la devianza residual
+diferencia_deviance <- null_deviance - residual_deviance
+
+# Obtenim els graus de llibertat
+df <- model_logistic_final$df.null - model_logistic_final$df.residual
+
+# Calculem la probabilitat de l'estadístic del test Chi-quadrat
+p_value <- pchisq(diferencia_deviance, df, lower.tail = FALSE)
+
+cat("Null Deviance: ", null_deviance, "\n")
+cat("Residual Deviance: ", residual_deviance, "\n")
+cat("Diferència de Deviance (Chi-quadrat): ", diferencia_deviance, "\n")
+cat("Graus de llibertat: ", df, "\n")
+cat("P-Value: ", p_value, "\n")
+```
+La devianza residual (14559.19) és significativament menor que la devianza nul·la (22866.87), així que el model amb les variables predictives proporciona un millor ajust que el model nul. El p-value és pràcticament zero, cosa que indica que la millora en l'ajustproporcionat pel model és extremadament significativa. Amb tota aquesta informació podem dir que el model final és robust i significatiu per predir si el preu d'un habitatge serà superior o igual a 500000 euros.
+
+
+## Corba ROC
+
+Dibuixarem la corba ROC i calcular l’àrea sota la corba.
+
+```{r}
+library(pROC)
+
+# Generem les prediccions
+prediccions_prob <- predict(model_logistic_final, conjunt_prova_filtrat2, type = "response")
+
+# ROC
+roc_obj <- roc(conjunt_prova2$price_re, prediccions_prob)
+plot(roc_obj, main = "Corba ROC per al model de regressió logística", col = "blue")
+
+# AUC
+auc_value <- auc(roc_obj)
+print(paste("Àrea sota la corba (AUC): ", auc_value))
+```
+
+Que la corba ROC estigui lluny de la diagonal ens indica que no és una classificació aleatòria, a més, la corba es corba cap a la part superior esquerra, indicant un bon equilibri entre sensibilitat i especificitat.
+
+Un valor AUC de 0.875 ens indica que el model és molt bo distingint entre habitatges amb preu superior i inferior als 500000€ (87.5% dels casos).
+
+
+# Resum i conclusions de l’anàlisi
+
+En aquest estudi s'analitzen les dades d'habitatges de l'estat de Washington per identificar els factors que més influencien el preu dels habitatges. Les principals conclusions extretes de l'anàlisi són les següents:
+
+ * **Factors Clau Relacionats amb la Mida:** Les superfícies habitables (m²) i del terreny (m²) mostren una correlació forta amb el preu dels habitatges. Els habitatges amb majors superfícies solen tenir més banys, més habitacions, i un preu més elevat.
+ 
+ 
+ * **Importància de les Característiques del Barri:** Les característiques del barri, com la superfície habitable mitjana dels 15 veïns més propers, també influeixen significativament en el preu dels habitatges. Això ens indica que la localització i l'entorn immediat tenen un impacte considerable en la valoració dels habitatges.
+ 
+ 
+ * **Interrelacions entre Característiques:** Variables com el nombre de banys i habitacions estan moderadament correlacionades, cosa que ens indica que aquestes característiques solen variar conjuntament. Això significa que habitatges amb més habitacions també tendeixen a tenir més banys.
+ 
+Amb tota aquesta informació, podem treure les següents conclusions:
+ 
+ * Els factors més influents són la superfície habitable i del terreny de l'habitatge, així com les característiques del barri com la superfície habitable mitjana dels veïns.
+ 
+ 
+ * Hi ha una correlació positiva significativa entre la mida del terreny i de l'habitatge amb el preu final, indicant que habitatges més grans solen ser més cars.
+ 
+ * Les característiques dels veïns, especialment la superfície habitable mitjana dels habitatges propers, tenen una influència notable en el preu de l'habitatge.
+ 
+Aquestes conclusions són útils per agències i professionals del mercat immobiliari per predir l'evolució dels preus i comprendre millor els factors clau en la valoració dels habitatges.

@@ -1,0 +1,511 @@
+---
+title: "Influència del gènere, entorn lingüístic i hàbits de lectura en el rendiment del lector: Anàlisi de les dades PISA"
+author: "Marc Bracons Cucó"
+date: '`r format(Sys.Date(),"%e de %B, %Y")`'
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+
+
+# 1. Introducció
+
+En aquesta activitat aplicarem una anàlisi descriptiva i inferencial sobre el conjunt de dades Pisa que hem
+preprocessat a l’activitat anterior.
+El Programa per a l’Avaluació Internacional d’Estudiants (PISA) és una prova que s’aplica cada tres anys a
+estudiants de 15 anys de tot el món per avaluar-ne el rendiment en matemàtiques, lectura i ciències. Aquesta
+prova proporciona una forma quantitativa de comparar el rendiment acadèmic dels estudiants de diferents
+parts del món.
+El conjunt de dades pisa_clean.csv conté informació sobre la demografia i les escoles dels estudiants nord-
+americans que fan l’examen, derivada dels arxius de dades d’ús públic PISA del 2009 distribuïts pel CentreNacional d’Estadístiques Educatives (NCES) dels Estats Units. Cada fila del conjunt de dades conté la següent
+informació d’un estudiant:
+
+ * grade: El curs que realitza l’estudiant (la majoria dels estudiants de 15 anys als Estats Units són al
+desè curs)
+ * male: Si l’estudiant és home (1/0)
+ * raceeth: La composició de raça/ètnia de l’estudiant
+ * preschool: Si l’estudiant va assistir a preescolar (1/0)
+ * expectBachelors: Si l’estudiant espera fer un grau universitari (1/0)
+ * motherHS: Si la mare de l’estudiant va completar l’escola secundària (1/0)
+ * motherBachelors: Si la mare de l’estudiant va obtenir una llicenciatura (1/0)
+ * motherWork: Si la mare de l’estudiant té feina a temps parcial o complet (1/0)
+ * fatherHS: Si el pare de l’estudiant va completar l’escola secundària (1/0)
+ * fatherBachelors: Si el pare de l’estudiant va obtenir una llicenciatura (1/0)
+ * fatherWork: Si el pare de l’estudiant té feina a temps parcial o complet (1/0)
+ * selfBornUS: Si l’estudiant va néixer als Estats Units (1/0)
+ * motherBornUS: Si la mare de l’estudiant va néixer als Estats Units (1/0)
+ * fatherBornUS: Si el pare de l’estudiant va néixer als Estats Units (1/0)
+ * englishAtHome: Si l’estudiant parla anglès a casa (1/0)
+ * computerForSchoolwork: Si l’estudiant té accés a un ordinador per fer les tasques escolars (1/0)
+ * read30MinsADay: Si l’estudiant llegeix per plaer durant 30 minuts/dia (1/0)
+ * minutesPerWeekEnglish: El nombre de minuts per setmana que l’estudiant dedica a classe d’anglès.
+ * studentsInEnglish: El nombre d’estudiants a classe d’anglès d’aquest estudiant a l’escola.
+ * schoolHasLibrary: Si l’escola d’aquest estudiant té una biblioteca (1/0)
+ * publicSchool: Si aquest estudiant assisteix a una escola pública (1/0)
+ * urban: Si l’escola d’aquest estudiant està en una àrea urbana (1/0)
+ * schoolSize: El nombre d’estudiants a l’escola.
+ * readingScore: puntuació de lectura de l’estudiant, a una escala de 1000 punts.
+
+
+
+# Estadística Descriptiva
+
+En primer lloc, fem una anàlisi descriptiva d’algunes variables d’interès i la relació amb readingScore. Així que carreguem els paquets necessaris per a l'estudi i el joc de dades.
+
+```{r}
+library(ggplot2)
+
+pisa_data <- read.csv("pisa_clean.csv")
+```
+
+## Distribució de variables
+
+En primer lloc, mostrem visualment la distribució de gènere a la població, així com la proporció dels estudiants
+que parlen anglès a casa amb relació als que no parlen anglès.
+
+```{r}
+ggplot(pisa_data, aes(x = factor(male), fill = factor(male))) +
+  geom_bar() +
+  labs(x = "Gènere (0 = Femení, 1 = Masculí)", y = "Nombre d'estudiants") +
+  ggtitle("Distribució de gènere dels estudiants") +
+  scale_fill_discrete(name = "Gènere", labels = c("Femení", "Masculí"))
+
+ggplot(pisa_data, aes(x = factor(englishAtHome), fill = factor(englishAtHome))) +
+  geom_bar() +
+  labs(x = "Anglès a casa (0 = No, 1 = Sí)", y = "Nombre d'estudiants") +
+  ggtitle("Proporció d'estudiants que parlen anglès a casa") +
+  scale_fill_discrete(name = "Anglès a casa", labels = c("No", "Sí"))
+```
+
+El nostre joc de dades és equilibrat respecte al gènere de les persones, però observem que el nombre de persones que parlen anglès a casa és molt elevat que el nombre de persones que no ho fan. 
+
+
+## Anàlisi descriptiva de readingScore
+
+També mostrem visualment la distribució de la variable readingScore.
+
+```{r}
+ggplot(pisa_data, aes(x = readingScore)) +
+  geom_histogram(binwidth = 10, fill = "cadetblue3", color = "black") +
+  labs(x = "Puntuació de Lectura", y = "Freqüència") +
+  ggtitle("Distribució de la Puntuació de lectura")
+```
+
+Observem un histograma amb una distribució pràcticament simètrica (pot indicar que les puntuacions segueixen una distribució normal). El punt més alt de la distribució es troba en la puntuació al voltant dels 500 punts, indicant que aquesta és la puntuació al voltant d'aquest valor és l'interval de puntuacions que han obtingut més nombre d'estudiants. Hi podem veure una cua tant a la dreta com a l'esquerra de la distribució, per tant, podem dir que les puntuacions extremes són poc comunes. Finalment, cal mencionar que no hi veiem valors extremadaments baixos o alts (outliers), cosa que té sentit, ja que es tracta d'un joc de dades ja netejat prèviament.
+
+
+## Distribució de readingScore segons variables d’interès
+
+A continuació mostrem visualment la distribució de la variable readingScore en funció de les variables següents:
+
+ * male
+ * EnglishAtHome
+ * read30MinsADay
+ * urban
+ * selfBornUS
+ * minutesPerWeekEnglish
+ * schoolSize
+ 
+Per a cada cas escollirem el tipus de gràfic que sigui més apropiat. Per a les variables categòriques farem servir gràfics de caixa mentre que per les variables numèriques farem servir gràfics de dispersió.
+
+```{r}
+ggplot(pisa_data, aes(x = factor(male), y = readingScore)) +
+  geom_boxplot() +
+  labs(x = "Gènere (0 = Femení, 1 = Masculí)", y = "Puntuació de lectura") +
+  ggtitle("Distribució de la Puntuació de lectura per Gènere")
+```
+
+En aquest gràfic podem veure la relació entre les puntuacions de lectura i el gènere de la persona. Hi apreciem que el valor de la mediana és pràcticament igual independentment del gènere, el mateix podem dir dels intervals interquartílics. Pel que fa a la variança, els dos gèneres presenten una variabilitat considerable. L'única diferència notable és que el gènere femení presenta valors atípics, mentre que el masculí no.
+
+```{r}
+ggplot(pisa_data, aes(x = factor(englishAtHome), y = readingScore)) +
+  geom_boxplot() +
+  labs(x = "Anglès a casa (0 = No, 1 = Sí)", y = "Puntuació de Lectura") +
+  ggtitle("Distribució de la Puntuació de lectura segons Anglès a Casa")
+```
+
+En aquets segon gràfic hi podem veure la distribució de la puntuació de lectura en funció de si els estudiants parlen anglès a casa. Hi ha tres categories, ja que hi ha valors NA.
+
+La mediana és lleugerament més alta pels estudiants que sí que parlen anglès a casa. Pel que fa als quartils, sembla que la diferència entre el primer i el tercer quartil dels estudiants que parlen anglès a casa és més petita que la dels que no, una caixa més estreta ens indica menys variabilitat en les puntuacions. En els dos casos hi ha valors atípics, però en els estudiants que parlen anglès a casa, aquests valors estan a la part inferior de la caixa, sent aquests, els alumnes amb puntuacions molt inferiors a la que s'esperaria d'ells.
+
+Els estudiants amb dades NA presenten una distribuació molt semblant a la dels estudiants que no parlen anglès a casa. 
+
+```{r}
+ggplot(pisa_data, aes(x = factor(read30MinsADay), y = readingScore)) +
+  geom_boxplot() +
+  labs(x = "Llegeix 30 Minuts al Dia (0 = No, 1 = Sí)", y = "Puntuació de lectura") +
+  ggtitle("Distribució de la Puntuació de lectura segons Lectura diària")
+```
+
+Al mirar la distribució de la puntuació en funció de la lectura diària, igual que en el cas anterior, aquí també hi tenim valors NA.
+
+Els resultats són molt semblants als de la comparació anterior, veient que la mediana es superior en els casos que l'estudiant llegeix 30 minuts al dia, així com presenten una menor variabilitat. En aquest cas, els dos casos presenten outliers només en la part inferior de la caixa.
+
+```{r}
+ggplot(pisa_data, aes(x = factor(urban), y = readingScore)) +
+  geom_boxplot() +
+  labs(x = "Àrea Urbana (0 = No, 1 = Sí)", y = "Puntuació de Lectura") +
+  ggtitle("Distribució de la Puntuació de lectura segons Àrea Urbana")
+```
+
+No sembla haver-hi una diferència notable en la distribució de les puntuacions de lectura entre les escoles urbanes i no urbanes. 
+
+```{r}
+ggplot(pisa_data, aes(x = factor(selfBornUS), y = readingScore)) +
+  geom_boxplot() +
+  labs(x = "Nascut als EUA (0 = No, 1 = Sí)", y = "Puntuació de lectura") +
+  ggtitle("Distribució de la Puntuació de lectura segons Lloc de Naixement")
+```
+
+Pel que fa a la puntuació de lectura segons el lloc de naixement, la mediana es pràctiament igual, així com la variabilitat. En el cas dels estudiants nascuts als EUA, hi ha un nombre important de valors atípics.
+
+```{r}
+ggplot(pisa_data, aes(x = minutesPerWeekEnglish, y = readingScore)) +
+  geom_point(alpha = 0.5) +
+  labs(x = "Minuts per Setmana en anglès", y = "Puntuació de lectura") +
+  ggtitle("Distribució de la Puntuació de lectura vs. Temps en Classe d'anglès")
+```
+
+En aquest gràfic hi veiem la distribució de la puntuació de lectura en funció del temps en classe d'anglès. Hi observem una concentració de punts al voltant dels 200-300 minuts per setmana (pot ser que es tracti de la durada estàndard de les classes en anglès setmanals de les escoles). Les puntuacions es distribueixen àmpliament a través dels diversos temps, sense mostrar una clara tendència.
+
+Al gràfic hi podem veure que s'han eliminat 186 files, ja que aquestes tenien *missing values*.
+
+```{r}
+ggplot(pisa_data, aes(x = schoolSize, y = readingScore)) +
+  geom_point(alpha = 0.5) +
+  labs(x = "Mida de l'Escola", y = "Puntuació de lectura") +
+  ggtitle("Distribució de la Puntuació de lectura vs. Mida de l'Escola")
+```
+
+En aquest gràfic hi veiem la distribució de les puntuacions en funció de la mida de l'escola. Hi podem veure una alta densitat de punts entre 250 i 1500 alumnes per escola, indicant una gran variabilitat entre escoles grans i petites. No hi observem cap patró que ens indiqui la relació entra la mida de l'escola i la puntuació de lectura. 
+
+
+
+# Interval de confiança de readingScore
+
+Per seguir amb l'estudi, però ara amb un altre punt de vista, calcularem l’interval de confiança del valor mitjà de readingScore al 95% i al 97%.
+
+Per a calcular l'interval de confiança sobre el valor mitjà de readigScore, com la variància és desconeguda, en farem una estimació a partir de la desviació de la mostra. En aquestes condicions, la variable segueix una distribució $t$ d'Student amb $n-1$ graus de llibertat:
+
+$\frac{\bar{X}-\mu}{\frac{s}{\sqrt{n}}} \thicksim t_{n-1}$
+
+I l'interval de confiança es reformula tal com segueix:
+
+$[\bar{X}-t_{1-\alpha/2, n-1}\frac{s}{\sqrt{n}}, \bar{X}+t_{1-\alpha/2, n-1}\frac{s}{\sqrt{n}}]$
+
+```{r}
+# Funció per calcular l'interval de confiança d'una mostra per a un nivell de confiança a determinar
+
+interval_conf <- function(data, nivell_conf) {
+  n <- length(data)
+  mitjana <- mean(data, na.rm = TRUE)
+  desviacio_estandard <- sd(data, na.rm = TRUE)
+  
+  alpha <- 1 - nivell_conf
+  valor_t <- qt(1 - alpha/2, df = n-1)
+  
+  se <- desviacio_estandard / sqrt(n)
+  
+  interval_inferior <- mitjana - valor_t * se
+  interval_superior <- mitjana + valor_t * se
+  
+  return(c(inferior = interval_inferior, superior = interval_superior))
+}
+```
+
+```{r}
+reading_scores <- pisa_data$readingScore
+
+interval_95 <- interval_conf(reading_scores, 0.95)
+interval_97 <- interval_conf(reading_scores, 0.97)
+
+print(paste("Interval de confiança al 95%: Límit inferior =", interval_95[1], "Límit superior =", interval_95[2]))
+print(paste("Interval de confiança al 97%: Límit inferior =", interval_97[1], "Límit superior =", interval_97[2]))
+```
+
+
+
+# Anàlisi de factors que influeixen en readingScore
+
+Realitzarem un contrast per avaluar les diferències en readingScore en relació amb les variables d’interès
+identificades. En concret, ens preguntem si hi ha diferències significatives en el valor mitjà de readingScore
+en funció de: gènere, si es parla anglès a casa, si l’estudiant llegeix 30 minuts per plaer, zona urbana, si
+l’estudiant ha nascut als Estats Units, segons el nombre de minuts per setmana d’anglès i la mida de l’escola.
+Per estudiar la influència de la variable del nombre de minuts per setmana que l’estudiant dedica a la classe
+d’anglès, aquesta variable es convertirà en dos valors: elevat (per a valors superiors a 250) i baix (la resta de
+valors). Farem el mateix per a la variable grandària de l’escola: valor gran (mides superiors a 1000) i petit (la
+resta de valors).
+
+Per fer aquesta anàlisi de forma sintètica, s’implementarà una funció de contrast que rebrà dues mostres de
+dades i tornarà els resultats del test (valor p, valor crític, valor observat).
+
+
+## Hipòtesis
+
+El primer pas es escriure les hipòtesis nul·la i alternativa. Ho farem de forma general, ja que aplicarem el mateix test a totes les variables.
+
+ * **Hipòtesi nul·la (H0)**: No hi ha diferències significatives en el valor mitjà de *readingScore* entre els grups definits per la variable d'interès.
+ 
+  * **Hipòtesi alternativa (H1)**: Hi ha diferències significatives en el valor mitjà de *readingScore* entre els grups definits per la variable d'interès.
+
+Sent les variables d'interès: gènere, si es parla anglès a casa, si l’estudiant llegeix 30 minuts per plaer, zona urbana, si
+l’estudiant ha nascut als Estats Units, segons el nombre de minuts per setmana d’anglès i la mida de l’escola.
+
+## Tipus de contrast
+
+El tipus de contrast serà el *t-test*. Hem triat aquest ja que:
+
+ * Les mostres són independents: Els grups que comparem (gènere masculí vs. femení, per exemple) estan format per grups diferents d'estudiants.
+ * Distribució normal: La mostra es prou gran (3663 observacions) la distribució tendirà cap a una distribució normal (Teorema Central del Límit).
+ * Variància similar: Assumim que la variància és similar entre els grups. 
+ * Eliminar els valors NA: Treballarem només amb dades completes. 
+
+
+## Funció de contrast
+
+A continuació implementarem els càlculs necessaris per realitzar el contrast, seguint el procés indicat més amunt.
+
+```{r}
+t_test_custom <- function(mostra1, mostra2, nivell_conf) {
+  
+  mitjana1 <- mean(mostra1, na.rm = TRUE)
+  mitjana2 <- mean(mostra2, na.rm = TRUE)
+  
+  desviacio_estandard1 <- sd(mostra1, na.rm = TRUE)
+  desviacio_estandard2 <- sd(mostra2, na.rm = TRUE)
+  
+  n1 <- length(na.omit(mostra1))
+  n2 <- length(na.omit(mostra2))
+  
+  valor_observat <- (mitjana1 - mitjana2) / sqrt((desviacio_estandard1^2/n1) + (desviacio_estandard2^2/n2))
+  
+  # Calculem els graus de llibertat
+  df <- ((desviacio_estandard1^2/n1) + (desviacio_estandard2^2/n2))^2 / (((desviacio_estandard1^2/n1)^2)/(n1-1) + ((desviacio_estandard2^2/n2)^2)/(n2-1))
+  
+  # Calculem el valor crític
+  valor_critic <- qt(1 - (1 - nivell_conf)/2, df)
+  
+  # Calculem el valor p
+  valor_p <- 2 * pt(-abs(valor_observat), df)
+  
+  # Taula de resultats
+  resultats <- data.frame(
+    Variable = NA,  # De moment NA, després s'omple
+    Observed_Value = valor_observat,
+    Critical_Value = valor_critic,
+    P_Value = valor_p,
+    Significant = ifelse(valor_p < (1 - nivell_conf), "Si", "No")
+  )
+  
+  return(resultats)
+}
+```
+
+
+## Càlcul del contrast
+
+Ara ja podem aplicar els contrastos per avaluar si hi ha diferències significatives en readingScore segons cada variable,
+usant la funció de contrast implementada. Un cop realitzats els càlculs, resumim els resultats en una taula, de
+manera que cada fila correspongui a una variable i a les columnes s’indiqui el valor observat, el valor crític, el
+valor p obtingut i un breu comentari sobre si la diferència és significativa.
+
+```{r}
+# Funció de contrast
+aplicar_contrast <- function(data, variable, cutpoint = NULL, high_is_above = TRUE, nivell_conf = 0.95) {
+  if (!is.null(cutpoint)) {
+    group <- ifelse(data[[variable]] > cutpoint, "high", "low")
+  } else {
+    group <- data[[variable]]
+  }
+  
+  mostra1 <- data$readingScore[group == ifelse(!is.null(cutpoint), "low", 0)]
+  mostra2 <- data$readingScore[group == ifelse(!is.null(cutpoint), "high", 1)]
+  
+  contrast_resultats <- t_test_custom(mostra1, mostra2, nivell_conf)
+  contrast_resultats$Variable <- variable
+  
+  return(contrast_resultats)
+}
+
+# Variables - minutesPerWeekEnglish i schoolSize es tornen categòriques tenint en compte
+#             els umbrals decidits prèviament.
+variables_info <- list(
+  "male" = list(cutpoint = NULL, high_is_above = TRUE),
+  "englishAtHome" = list(cutpoint = NULL, high_is_above = TRUE),
+  "read30MinsADay" = list(cutpoint = NULL, high_is_above = TRUE),
+  "urban" = list(cutpoint = NULL, high_is_above = TRUE),
+  "selfBornUS" = list(cutpoint = NULL, high_is_above = TRUE),
+  "minutesPerWeekEnglish" = list(cutpoint = 250, high_is_above = TRUE),
+  "schoolSize" = list(cutpoint = 1000, high_is_above = TRUE)
+)
+
+
+llista_resultats <- list()
+
+# Apliquem contrast a totes les variables
+llista_resultats <- lapply(names(variables_info), function(var) {
+  info <- variables_info[[var]]
+  aplicar_contrast(pisa_data, var, info$cutpoint, info$high_is_above, nivell_conf = 0.95)
+})
+
+taula_resultats <- do.call(rbind, llista_resultats)
+rownames(taula_resultats) <- NULL
+print(taula_resultats)
+```
+
+## Interpretació
+
+En funció dels resultats obtinguts a l’apartat anterior i resumits a la taula, podem treure les següents conclusions sobre en quins casos
+s’observen diferències significatives a readingScore.
+
+ * **Gender:** El valor observat és molt més gran que el valor crític, el *p-value* és extremadament petit (exponent -21). Per tant, rebutgem la hipòtesi nul·la, acceptant l'alternativa. Hi ha una diferència significativa en les puntuacions de lectura entre gèneres.
+ 
+ * **englishAtHome:** El valor observat i el crític estan molt distanciats, a més, el *p-value* torna a ser molt petit. Podem dir, doncs, que hi ha una diferència significativa en les puntuacions de lectura entre els alumnes que parlen anglès a casa i els que no.
+ 
+ * **read30MinsADay:** En aquest cas, la distància entre el valor observat i el crític és encara més gran, a més, el *p_value* és el més petit de tots. En aquest cas també hi ha una diferència significativa en les puntuacions de lectura entre els alumnes que llegeixen 30 minuts al dia i els que no ho fan.
+ 
+ * **urban:** Tot i que la distància entre el valor observat i el crític és més petita, el *p_value* segueix tenint un valor petit, així que hi ha una diferència significativa en les puntuacions de lectura en funció de si la zona és o no urbana.
+ 
+ * **selfBornUS:** En aquest cas, el valor observat és menor en valor absolut que el valor crític, a més, el *p-value* és més gran que 0.05. No hi ha suficients evidències per rebutjar la hipòtesi nul·la; la diferència en les puntuacions de lectura en funció del lloc de naixement no és estadísticament significativa.
+ 
+ * **minutesPerWeekEnglish:** Al igual que en els primers casos, la diferència entre el valor observat i el valor crític, així com el valor petit de *p-value* ens porten a rebutjar la hipòtesi nul·la.
+ 
+ * **schoolSize:** El valor observat és menor al valor crític en valor absolut, a més, el *p-value* és superior a 0.05. No hi ha una diferència significativa en les puntuacions de lectura entre escoles amb més de 1000 estudiants i les més petites. 
+
+
+# Relació entre parlar anglès a casa i lectura a casa
+
+Ara ens preguntem si els estudiants que parlen anglès a casa (englishAtHome) tendeixen a
+llegir per plaer almenys 30 minuts (read30MinsADay). Per això volem investigar si els valors d’aquestes dues
+variables estan relacionades.
+
+## Hipòtesis nul·la i alternativa
+
+Al igual que en el cas anterior, escriurem les hipòtesis.
+
+ * **Hipòtesi nul·la:** No hi ha cap relació entre parlar anglès a casa i la tendència a llegir per plaer durant almenys 30 minuts al dia.
+ * **Hipòtesi alternativa:** Hi ha una relació entre parlar anglès a casa i la tendència a llegir per plaer durant almenys 30 minuts al dia.
+
+
+## Test
+
+També decidim quin tipus de test utilitzarem. En aquest cas optarem per un test **khi-quadrat**, ja que les dues variables són categòriques. A més, ens serveix per comparar la distribució de freqüències de categories entre dues variables, així com si hi ha una associació entre elles o no (independència).
+
+
+## Càlcul del test
+
+Els passos que seguirem són:
+
+ * Crear una taula de contingència de les dues variables
+ * Calcular les freqüències esperades (en funció de les proporcions marginals)
+ * Calcular khi-quadrat
+ * Trobar el p-valor
+
+```{r}
+tabela_contingencia <- with(pisa_data, table(englishAtHome, read30MinsADay, useNA = "no"))
+
+total <- sum(tabela_contingencia)
+freq_marginals_row <- rowSums(tabela_contingencia)
+freq_marginals_col <- colSums(tabela_contingencia)
+freq_esperades <- outer(freq_marginals_row, freq_marginals_col, FUN = "*") / total
+
+khi_squared_stat <- sum((tabela_contingencia - freq_esperades)^2 / freq_esperades)
+
+df <- (nrow(tabela_contingencia) - 1) * (ncol(tabela_contingencia) - 1)
+
+p_value <- pchisq(khi_squared_stat, df, lower.tail = FALSE)
+
+resultats <- c(khi_squared_stat, df, p_value)
+
+names(resultats) <- c("Estadístic Khi-Quadrat", "Graus de llibertat", "p-valor")
+
+print(resultats)
+```
+
+
+
+# Interpretació del test
+
+El valor baix de l'estadístic ens indica que la diferència entre les freqüències observades i esperades és petita. El grau de llibertat és 1, ja que hem eliminat els valors *NA* i les variables amb les que hem treballat tenen dos possibles valors. Finalment, el p-valor és força alt, per sobre del 0.005.
+
+Al tindre un p-valor tan alt, no rebutgem la hipòtesi nul·la, és a dir, no hi ha prou evidència per dir que hi ha una relació entre parlar anglès a casa i llegir 30 minuts per plaer al dia. 
+
+
+
+# Relació entre parlar anglès a casa i lectura a casa (aproximació 2)
+
+En aquesta secció repetim l’anàlisi anterior fent servir un test de diferència de proporcions. És a dir, ens
+preguntem si la proporció d’estudiants que llegeixen a casa és diferent entre els estudiants que parlen en
+anglès a casa en relació amb els que no parlen en anglès a casa.
+
+
+## Hipòtesis nul·la i alternativa
+
+ * **Hipòtesi nul·la:** La proporció d'estudiants que llegeixen per plaer almenys 30 minuts al dia és la mateixa entre els estudiants que parlen anglès a casa i els que no ($p_1 = p_2$).
+ * **Hipòtesi alternativa:** La proporció d'estudiants que llegeixen per plaer almenys 30 minuts al dia és diferent entre els estudiants que parlen anglès a casa i els que no ($p_1 \neq p_2$).
+
+
+## Test
+
+Farem servir un test de proporcions per a dues mostres, ja que tenim moltes mostres i les proporcions tendiran a distribuir-se normalment al voltant de la veritable proporció de la població (Teorema Central del Límit). A més, estem treballant amb dades que segueixen una distribució de Bernoulli per a cada mostra. Finalment, és un test per a fer la comparació per a dues mostres.
+
+
+## Càlculs previs
+
+Primer calculem les proporciones del grup que parla anglès a casa i del que no ho fa.
+
+```{r}
+englishAtHome_yes <- pisa_data[pisa_data$englishAtHome == 1, ]
+englishAtHome_no <- pisa_data[pisa_data$englishAtHome == 0, ]
+
+n1 <- sum(englishAtHome_yes$read30MinsADay, na.rm = TRUE)  # Nombre d'estudiants que llegeixen a casa i parlen anglès
+N1 <- sum(!is.na(englishAtHome_yes$read30MinsADay))        # Nombre total d'estudiants que parlen anglès a casa
+p1 <- n1 / N1                                              # Proporció d'estudiants que llegeixen a casa i parlen anglès
+
+n2 <- sum(englishAtHome_no$read30MinsADay, na.rm = TRUE)   # Nombre d'estudiants que llegeixen a casa i no parlen anglès
+N2 <- sum(!is.na(englishAtHome_no$read30MinsADay))         # Nombre total d'estudiants que no parlen anglès a casa
+p2 <- n2 / N2                                              # Proporció d'estudiants que llegeixen a casa i no parlen anglès
+
+print(paste("Proporció que llegeixen per plaer i parlen anglès a casa:", p1))
+print(paste("Proporció que llegeixen per plaer i no parlen anglès a casa:", p2))
+```
+
+
+## Desenvolupament del contrast
+
+Ara podem implementar el codi per a calcular el contrast.
+
+```{r}
+p <- (n1 + n2) / (N1 + N2)
+SE <- sqrt(p * (1 - p) * (1/N1 + 1/N2))
+z <- (p1 - p2) / SE
+
+p_value <- 2 * (1 - pnorm(abs(z)))
+
+resultats <- c("Estadístic Z" = z, "p-valor" = p_value)
+print(resultats)
+```
+
+
+## Interpretació del test
+
+El valor petit de l'estadístic de Z ens indica que la diferència entre les proporcions observades és molt petita, per tant, no significativa. A més, el p-valor té un valor molt alt per sobre 0.05, és a dir, no hi ha evidència suficient com per rebutjar la hipòtesi nul·la.
+
+Per tant, no hi ha una diferència significativa en les proporcions d'estudiants que llegeixen per plaer almenys 30 minuts al dia entre els que parlen anglès a casa i els que no.
+
+
+
+# Conclusions
+
+En aquest estudi hem analitzat un joc de dades del PISA, a més, aquestes dades havien estat preprocessades per netejar-les. L'objectiu de l'estudi és comprendre millor quins factors poden influir en les puntuacions de lectura dels estudiants. En l'anàlisi previ hem vist que les dades estan equilibrades en termes de gènere i hem notat una major presència d'alumnes que parlen anglès a casa. Aquest desequilibri ha sigut un punt clau en l'interès de les implicacions sobre els resultats dels estudiants.
+
+Els hitogrames que hem examinat ens han mostrat distribucions pràcticament simètriques, indicant una possible distribució normal. Tot i això, un cop realitzats els tests d'hipòtesi hem vist algunes relacions significatives sorprenents. Per exemple, tot i que a l'histograma no hi vam poder veure diferències notables en puntuacions de lectures en funció del gènere, els tests d'hipòtesi han indicat que efectivament hi ha una diferència significativa.
+
+En canvi, tot i que els estudiants que llegeixen per plaer tenen puntuacions més altes, no hem pogut demostrar una diferència significativa en les proporcions d'estudiants que llegeixen entre els que parlen anglès a casa i els que no. Això contradiu la nostra suposició inicial basada en l'anàlisi exploratòria.
+
+Hem vist que d'altres variables com el lloc de naixement o la mida de l'escola, no tenen un impacte significatiu en les puntuacions de lectura. Tal com hem vist durant el primer anàlisi i posteriorment en els tests d'hipòtesi.
+
+Així doncs, mentre que alguns dels nostres resultats han confirmat les nostres observacions preliminars, altres ens han proporcionat noves perspectives que només han sigut evidents un cop aplicats els tests d'hipòtesi. Això deixa clar que és important combinar l'anàlisi exploratòria de les dades amb altres mètodes més rigorosos per a tindre una comprensió completa dels patrons del joc de dades.
