@@ -4,18 +4,18 @@ Conjunt d'assignatures cursades en el màster de ciència de dades
 
 ## Finalitzades
 
-- Anàlisi Estadística
-- Aprenentatge Automàtic
-- Arquitectura de bases de dades no relacionals
-- Disseny i ús de bases de dades analítiques
-- Mineria de dades
-- Programació per a la ciència de dades
+- Anàlisi Estadística - 9.2
+- Aprenentatge Automàtic - 9.4
+- Arquitectura de bases de dades no relacionals - 9
+- Disseny i ús de bases de dades analítiques - 8.9
+- Mineria de dades - 8.1
+- Programació per a la ciència de dades - 9.5 MH
+- Tipologia i cicle de vida de les dades - 9.1
+- Fonaments de la ciència de dades - 6.9
+- Visualització de dades - 9.2
 
-## Pendents
+## Cursant
 
-- Tipologia i cicle de vida de les dades
-- Fonaments de la ciència de dades
-- Visualització de dades
 - (OPT) Deep Learning
 - (OPT) Anàlisi de textos
 - Treball de final de màster
