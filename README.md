@@ -13,9 +13,6 @@ Conjunt d'assignatures cursades en el màster de ciència de dades
 - Tipologia i cicle de vida de les dades - 9.1
 - Fonaments de la ciència de dades - 6.9
 - Visualització de dades - 9.2
-
-## Cursant
-
-- (OPT) Deep Learning
-- (OPT) Anàlisi de textos
-- Treball de final de màster
+- (OPT) Deep Learning - 9.72
+- (OPT) Anàlisi de textos - 8.6
+- Treball de final de màster - 9.9 MH
